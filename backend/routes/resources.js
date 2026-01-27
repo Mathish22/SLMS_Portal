@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { storage, cloudinary } = require('../config/cloudinary'); // cloudinary config
 const Resource = require('../models/Resource');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const path = require('path');
 const { URL } = require('url');
@@ -9,25 +10,33 @@ const { URL } = require('url');
 const router = express.Router();
 const upload = multer({ storage });
 
-// Get all resources
+// Get all resources (filtered by regulation for students)
 router.get('/', authMiddleware.isAuthenticated, async (req, res) => {
   try {
-    const resources = await Resource.find();
+    const user = await User.findById(req.user.userId);
+    let query = {};
+
+    // Students only see resources matching their regulation
+    if (user.role === 'student' && user.regulation) {
+      query.regulation = user.regulation;
+    }
+
+    const resources = await Resource.find(query);
     res.json(resources);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// Upload a resource
+// Upload a resource (Staff only)
 router.post(
   '/upload',
   authMiddleware.isAuthenticated,
-  authMiddleware.isStaffOrAdmin,
+  authMiddleware.isStaff,
   upload.single('file'),
   async (req, res) => {
     try {
-      const { title, year, subjectCode, examType } = req.body;
+      const { title, year, subjectCode, examType, regulation } = req.body;
       if (!title || !year || !subjectCode || !examType || !req.file) {
         return res.status(400).json({ error: 'All fields are required' });
       }
@@ -37,8 +46,10 @@ router.post(
         year,
         subjectCode,
         examType,
+        regulation: regulation || '',
         filePath: req.file.path,
-        cloudinaryId: req.file.filename  // ✅ Cloudinary URL
+        cloudinaryId: req.file.filename,
+        uploadedBy: req.user.userId
       });
 
       await resource.save();

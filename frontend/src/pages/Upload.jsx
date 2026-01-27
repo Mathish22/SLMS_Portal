@@ -9,6 +9,7 @@ const Upload = () => {
     year: '',
     subjectCode: '',
     examType: '',
+    regulation: '',
     file: null,
   });
 
@@ -19,6 +20,7 @@ const Upload = () => {
   const [showYearSuggestions, setShowYearSuggestions] = useState(false);
 
   const examTypeSuggestions = ['CAT-1', 'CAT-2', 'CAT-3', 'Model'];
+  const regulationOptions = ['2021', '2022', '2023', '2024', '2025'];
   const currentYear = new Date().getFullYear();
   const yearSuggestions = [currentYear, currentYear - 1, currentYear - 2];
 
@@ -82,6 +84,7 @@ const Upload = () => {
     formDataToSend.append('year', year);
     formDataToSend.append('subjectCode', subjectCode);
     formDataToSend.append('examType', examType);
+    formDataToSend.append('regulation', formData.regulation);
     formDataToSend.append('file', file);
 
     try {
@@ -93,7 +96,7 @@ const Upload = () => {
       });
 
       setMessage(response.data.message || 'Resource uploaded successfully!');
-      setFormData({ title: '', year: '', subjectCode: '', examType: '', file: null });
+      setFormData({ title: '', year: '', subjectCode: '', examType: '', regulation: '', file: null });
       setShowExamTypeSuggestions(false);
       setShowYearSuggestions(false);
     } catch (err) {
@@ -225,6 +228,26 @@ const Upload = () => {
               )}
             </div>
 
+            {/* Regulation Dropdown */}
+            <div>
+              <label htmlFor="regulation" className="block font-semibold text-gray-700 mb-1">
+                Target Regulation
+              </label>
+              <select
+                name="regulation"
+                value={formData.regulation}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
+              >
+                <option value="">Select Regulation</option>
+                {regulationOptions.map((reg) => (
+                  <option key={reg} value={reg}>{reg}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Students with this regulation will see this material</p>
+            </div>
+
             {/* File Upload */}
             <div>
               <label htmlFor="file" className="block font-semibold text-gray-700 mb-1">
@@ -262,11 +285,10 @@ const Upload = () => {
             {/* Message */}
             {(message || error) && (
               <p
-                className={`text-center text-sm mt-3 font-medium ${
-                  (message && message.toLowerCase().includes('success')) || !error
-                    ? 'text-green-600'
-                    : 'text-red-600'
-                }`}
+                className={`text-center text-sm mt-3 font-medium ${(message && message.toLowerCase().includes('success')) || !error
+                  ? 'text-green-600'
+                  : 'text-red-600'
+                  }`}
               >
                 {message || error}
               </p>

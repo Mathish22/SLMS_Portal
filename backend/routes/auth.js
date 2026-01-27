@@ -37,7 +37,7 @@ router.get('/me', authMiddleware.isAuthenticated, async (req, res) => {
 // Admin: Create Staff account
 router.post('/create-staff', authMiddleware.isAdmin, async (req, res) => {
   try {
-    const { staffName, username, password } = req.body;
+    const { staffName, username, password, staffDepartment } = req.body;
 
     // Check if username already exists
     const existingUser = await User.findOne({ username });
@@ -45,41 +45,81 @@ router.post('/create-staff', authMiddleware.isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
+    // Auto-generate Staff ID starting with 'ests'
+    // Find the highest existing staff ID number
+    const lastStaff = await User.findOne({
+      role: 'staff',
+      staffId: { $regex: /^ests\d+$/i }
+    }).sort({ staffId: -1 });
+
+    let nextNumber = 1;
+    if (lastStaff && lastStaff.staffId) {
+      const match = lastStaff.staffId.match(/ests(\d+)/i);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+    const staffId = `ests${String(nextNumber).padStart(3, '0')}`;
+
     const staff = new User({
       staffName: staffName || '',
+      staffId: staffId,
       username,
       password,
       role: 'staff',
+      staffDepartment: staffDepartment || '',
       subjects: [],
       createdBy: req.user.userId
     });
     await staff.save();
     res.status(201).json({
       message: 'Staff account created successfully',
-      user: { _id: staff._id, staffName, username, role: 'staff' }
+      user: { _id: staff._id, staffName, staffId, username, role: 'staff', staffDepartment }
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// Admin: Edit Staff (update staffId, staffName, subjects)
+// Admin: Edit Staff (update staffId, staffName, staffDepartment, subjects)
 router.put('/staff/:id', authMiddleware.isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { staffName, staffId, subjects } = req.body;
+    const body = req.body;
 
-    const staff = await User.findById(id);
-    if (!staff || staff.role !== 'staff') {
+    console.log('=== Updating Staff ===');
+    console.log('Staff ID:', id);
+    console.log('Full Request Body:', body);
+
+    // Find staff by ID
+    const staff = await User.findOne({ _id: id, role: 'staff' });
+    if (!staff) {
       return res.status(404).json({ error: 'Staff not found' });
     }
 
-    // Update fields if provided
-    if (staffName !== undefined) staff.staffName = staffName;
-    if (staffId !== undefined) staff.staffId = staffId;
-    if (subjects !== undefined) staff.subjects = subjects;
+    console.log('Before update - staffDepartment:', staff.staffDepartment);
 
-    await staff.save();
+    // Directly set each field
+    if (body.staffName !== undefined) {
+      staff.staffName = body.staffName;
+    }
+    if (body.staffId !== undefined) {
+      staff.staffId = body.staffId;
+    }
+    if (body.staffDepartment !== undefined) {
+      staff.staffDepartment = body.staffDepartment;
+      staff.markModified('staffDepartment'); // Force Mongoose to recognize the change
+    }
+    if (body.subjects !== undefined) {
+      staff.subjects = body.subjects;
+      staff.markModified('subjects');
+    }
+
+    // Save with validation skipped for password
+    await staff.save({ validateModifiedOnly: true });
+
+    console.log('After update - staffDepartment:', staff.staffDepartment);
+
     res.json({
       message: 'Staff updated successfully',
       user: {
@@ -87,32 +127,61 @@ router.put('/staff/:id', authMiddleware.isAdmin, async (req, res) => {
         username: staff.username,
         staffName: staff.staffName,
         staffId: staff.staffId,
+        staffDepartment: staff.staffDepartment,
         subjects: staff.subjects
       }
     });
   } catch (error) {
+    console.error('Error updating staff:', error);
     res.status(400).json({ error: error.message });
   }
 });
 
-// Admin: Get all staff with search/filter
+// Admin: Get all staff with search/filter by department and year
 router.get('/staff', authMiddleware.isAdmin, async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, department, year } = req.query;
 
     let query = { role: 'staff' };
+    let andConditions = [];
 
-    // If search term provided, filter by subject code or name
-    if (search) {
-      query.$or = [
-        { 'subjects.subjectCode': { $regex: search, $options: 'i' } },
-        { 'subjects.subjectName': { $regex: search, $options: 'i' } },
-        { 'staffName': { $regex: search, $options: 'i' } },
-        { 'staffId': { $regex: search, $options: 'i' } }
-      ];
+    // Filter by department in subjects
+    if (department) {
+      andConditions.push({
+        $or: [
+          { 'subjects.department': { $regex: department, $options: 'i' } },
+          { 'staffDepartment': { $regex: department, $options: 'i' } }
+        ]
+      });
     }
 
-    const staff = await User.find(query, 'username staffName staffId subjects role createdAt');
+    // Filter by year in subjects
+    if (year) {
+      andConditions.push({
+        'subjects.year': { $regex: year, $options: 'i' }
+      });
+    }
+
+    // General search term
+    if (search) {
+      andConditions.push({
+        $or: [
+          { 'subjects.subjectCode': { $regex: search, $options: 'i' } },
+          { 'subjects.subjectName': { $regex: search, $options: 'i' } },
+          { 'subjects.department': { $regex: search, $options: 'i' } },
+          { 'staffName': { $regex: search, $options: 'i' } },
+          { 'staffId': { $regex: search, $options: 'i' } },
+          { 'staffDepartment': { $regex: search, $options: 'i' } }
+        ]
+      });
+    }
+
+    // Combine conditions
+    if (andConditions.length > 0) {
+      query.$and = andConditions;
+    }
+
+    const staff = await User.find(query, 'username staffName staffId staffDepartment subjects role createdAt');
     res.json(staff);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -122,7 +191,7 @@ router.get('/staff', authMiddleware.isAdmin, async (req, res) => {
 // Staff: Create Student account
 router.post('/create-student', authMiddleware.isStaff, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, regulation, studentName, rollNo, department, year } = req.body;
 
     // Check if username already exists
     const existingUser = await User.findOne({ username });
@@ -130,24 +199,117 @@ router.post('/create-student', authMiddleware.isStaff, async (req, res) => {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
+    // Check if roll number already exists
+    if (rollNo) {
+      const existingRollNo = await User.findOne({ rollNo });
+      if (existingRollNo) {
+        return res.status(400).json({ error: 'Roll number already exists' });
+      }
+    }
+
     const student = new User({
       username,
       password,
       role: 'student',
+      regulation: regulation || '',
+      studentName: studentName || '',
+      rollNo: rollNo || '',
+      department: department || '',
+      year: year || '',
       createdBy: req.user.userId
     });
     await student.save();
-    res.status(201).json({ message: 'Student account created successfully', user: { username, role: 'student' } });
+    res.status(201).json({
+      message: 'Student account created successfully',
+      user: {
+        _id: student._id,
+        username,
+        role: 'student',
+        regulation,
+        studentName,
+        rollNo,
+        department,
+        year
+      }
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// Staff: Get all students
+// Staff: Get all students with search
 router.get('/students', authMiddleware.isStaff, async (req, res) => {
   try {
-    const students = await User.find({ role: 'student' }, 'username role createdAt');
+    const { search } = req.query;
+    let query = { role: 'student' };
+
+    // If search term provided, filter by multiple fields
+    if (search) {
+      query.$or = [
+        { studentName: { $regex: search, $options: 'i' } },
+        { rollNo: { $regex: search, $options: 'i' } },
+        { department: { $regex: search, $options: 'i' } },
+        { year: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } },
+        { regulation: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const students = await User.find(query, 'username role regulation studentName rollNo department year createdAt');
     res.json(students);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Staff: Update student
+router.put('/student/:id', authMiddleware.isStaff, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, regulation, studentName, rollNo, department, year } = req.body;
+
+    const student = await User.findById(id);
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    // Check if username already exists (if changing username)
+    if (username && username !== student.username) {
+      const existingUser = await User.findOne({ username });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username already exists' });
+      }
+      student.username = username;
+    }
+
+    // Check if roll number already exists (if changing rollNo)
+    if (rollNo && rollNo !== student.rollNo) {
+      const existingRollNo = await User.findOne({ rollNo });
+      if (existingRollNo) {
+        return res.status(400).json({ error: 'Roll number already exists' });
+      }
+      student.rollNo = rollNo;
+    }
+
+    if (regulation !== undefined) student.regulation = regulation;
+    if (studentName !== undefined) student.studentName = studentName;
+    if (department !== undefined) student.department = department;
+    if (year !== undefined) student.year = year;
+
+    await student.save();
+    res.json({
+      message: 'Student updated successfully',
+      user: {
+        _id: student._id,
+        username: student.username,
+        role: student.role,
+        regulation: student.regulation,
+        studentName: student.studentName,
+        rollNo: student.rollNo,
+        department: student.department,
+        year: student.year
+      }
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

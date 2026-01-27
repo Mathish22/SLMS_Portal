@@ -12,11 +12,19 @@ const userSchema = new mongoose.Schema({
   // Staff-specific fields
   staffName: { type: String, default: '' },
   staffId: { type: String, default: '' },
+  staffDepartment: { type: String, default: '' },
   subjects: [{
     subjectCode: { type: String },
     subjectName: { type: String },
-    year: { type: String }
+    year: { type: String },
+    department: { type: String }
   }],
+  // Student-specific fields
+  regulation: { type: String, default: '' },
+  studentName: { type: String, default: '' },
+  rollNo: { type: String, default: '' },
+  department: { type: String, default: '' },
+  year: { type: String, default: '' },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

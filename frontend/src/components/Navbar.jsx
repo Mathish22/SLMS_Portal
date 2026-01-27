@@ -62,8 +62,8 @@ const Navbar = () => {
                   {/* Role Badge */}
                   <li className="hidden md:block">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                        role === 'staff' ? 'bg-blue-100 text-blue-700' :
-                          'bg-green-100 text-green-700'
+                      role === 'staff' ? 'bg-blue-100 text-blue-700' :
+                        'bg-green-100 text-green-700'
                       }`}>
                       {role?.charAt(0).toUpperCase() + role?.slice(1)}
                     </span>
@@ -85,8 +85,8 @@ const Navbar = () => {
                     </li>
                   )}
 
-                  {/* Upload - for staff and admin */}
-                  {(role === 'admin' || role === 'staff') && (
+                  {/* Upload - for staff only */}
+                  {role === 'staff' && (
                     <li>
                       <Link to="/upload" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
                         <i className="fas fa-upload mr-2"></i>Upload
