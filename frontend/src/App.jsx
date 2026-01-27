@@ -1,33 +1,46 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
-import EditResource from './pages/EditResource'; // Import EditResource
+import EditResource from './pages/EditResource';
 import ProtectedRoute from './components/ProtectedRoute';
-import RoleManagement from './pages/RoleManagement';
+import AdminDashboard from './pages/AdminDashboard';
+import StaffDashboard from './pages/StaffDashboard';
 
 function App() {
   return (
     <Router>
       <Navbar />
       <div className="min-h-screen items-center justify-center bg-orange-50">
-        
+
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+
+          {/* Admin Dashboard */}
           <Route
-              path="/role-management"
-              element={
-                <ProtectedRoute>
-                  <RoleManagement />
-                </ProtectedRoute>
-              }
-            />
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Staff Dashboard */}
+          <Route
+            path="/staff"
+            element={
+              <ProtectedRoute>
+                <StaffDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Student Dashboard */}
           <Route
             path="/dashboard"
             element={
@@ -36,6 +49,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/upload"
             element={
@@ -45,13 +59,16 @@ function App() {
             }
           />
           <Route
-            path="/edit-resource/:id" // Add this route
+            path="/edit-resource/:id"
             element={
               <ProtectedRoute>
                 <EditResource />
               </ProtectedRoute>
             }
           />
+
+          {/* Redirect old register route to login */}
+          <Route path="/register" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>
     </Router>

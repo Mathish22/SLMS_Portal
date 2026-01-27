@@ -5,12 +5,21 @@ const Navbar = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('role');
+  const username = localStorage.getItem('username');
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('username');
     navigate('/login');
+  };
+
+  // Determine dashboard link based on role
+  const getDashboardLink = () => {
+    if (role === 'admin') return '/admin';
+    if (role === 'staff') return '/staff';
+    return '/dashboard';
   };
 
   return (
@@ -50,25 +59,42 @@ const Navbar = () => {
             <ul className="flex flex-col md:flex-row items-center md:space-x-6 mt-4 md:mt-0">
               {token ? (
                 <>
+                  {/* Role Badge */}
+                  <li className="hidden md:block">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${role === 'admin' ? 'bg-purple-100 text-purple-700' :
+                        role === 'staff' ? 'bg-blue-100 text-blue-700' :
+                          'bg-green-100 text-green-700'
+                      }`}>
+                      {role?.charAt(0).toUpperCase() + role?.slice(1)}
+                    </span>
+                  </li>
+
+                  {/* Dashboard Link */}
                   <li>
-                    <Link to="/dashboard" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
+                    <Link to={getDashboardLink()} className="text-gray-800 hover:text-orange-500 text-sm font-medium">
                       <i className="fas fa-th-large mr-2"></i>Dashboard
                     </Link>
                   </li>
-                  {(role === 'admin' || role === 'faculty') && (
+
+                  {/* Resources - for staff and admin */}
+                  {(role === 'admin' || role === 'staff') && (
+                    <li>
+                      <Link to="/dashboard" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
+                        <i className="fas fa-book mr-2"></i>Resources
+                      </Link>
+                    </li>
+                  )}
+
+                  {/* Upload - for staff and admin */}
+                  {(role === 'admin' || role === 'staff') && (
                     <li>
                       <Link to="/upload" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
                         <i className="fas fa-upload mr-2"></i>Upload
                       </Link>
                     </li>
                   )}
-                  {role === 'admin' && (
-                    <li>
-                      <Link to="/role-management" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
-                        <i className="fas fa-user-cog mr-2"></i>Roles
-                      </Link>
-                    </li>
-                  )}
+
+                  {/* Logout Button */}
                   <li>
                     <button
                       onClick={handleLogout}
@@ -83,11 +109,6 @@ const Navbar = () => {
                   <li>
                     <Link to="/login" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
                       <i className="fas fa-sign-in-alt mr-2"></i>Login
-                    </Link>
-                  </li>
-                  <li>
-                    <Link to="/register" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
-                      <i className="fas fa-user-plus mr-2"></i>Register
                     </Link>
                   </li>
                 </>

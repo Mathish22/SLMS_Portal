@@ -23,7 +23,7 @@ router.get('/', authMiddleware.isAuthenticated, async (req, res) => {
 router.post(
   '/upload',
   authMiddleware.isAuthenticated,
-  authMiddleware.isFacultyOrAdmin,
+  authMiddleware.isStaffOrAdmin,
   upload.single('file'),
   async (req, res) => {
     try {
@@ -68,7 +68,7 @@ router.get('/:id', authMiddleware.isAuthenticated, async (req, res) => {
 router.put(
   '/:id',
   authMiddleware.isAuthenticated,
-  authMiddleware.isFacultyOrAdmin,
+  authMiddleware.isStaffOrAdmin,
   upload.single('file'),
   async (req, res) => {
     try {

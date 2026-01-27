@@ -6,10 +6,23 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['user', 'faculty', 'admin'], // Allowed roles
-    default: 'user', // Default role set to 'student'
+    enum: ['admin', 'staff', 'student'],
+    default: 'student',
   },
-});
+  // Staff-specific fields
+  staffName: { type: String, default: '' },
+  staffId: { type: String, default: '' },
+  subjects: [{
+    subjectCode: { type: String },
+    subjectName: { type: String },
+    year: { type: String }
+  }],
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+}, { timestamps: true });
 
 // Hash the password before saving
 userSchema.pre('save', async function (next) {

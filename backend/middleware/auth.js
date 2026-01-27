@@ -38,13 +38,24 @@ const authMiddleware = {
     });
   },
 
-  // Check if faculty or admin
-  isFacultyOrAdmin: (req, res, next) => {
+  // Check if staff
+  isStaff: (req, res, next) => {
     authMiddleware.verifyToken(req, res, () => {
-      if (['faculty', 'admin'].includes(req.user.role)) {
+      if (req.user.role === 'staff') {
         next();
       } else {
-        res.status(403).json({ message: 'Faculty or admin access required' });
+        res.status(403).json({ message: 'Staff access required' });
+      }
+    });
+  },
+
+  // Check if staff or admin
+  isStaffOrAdmin: (req, res, next) => {
+    authMiddleware.verifyToken(req, res, () => {
+      if (['staff', 'admin'].includes(req.user.role)) {
+        next();
+      } else {
+        res.status(403).json({ message: 'Staff or admin access required' });
       }
     });
   },
