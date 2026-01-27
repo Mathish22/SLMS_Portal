@@ -8,6 +8,7 @@ import Upload from './pages/Upload';
 import EditResource from './pages/EditResource';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminDashboard from './pages/AdminDashboard';
+import DepartmentAdminDashboard from './pages/DepartmentAdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 
 function App() {
@@ -26,6 +27,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Department Admin Dashboard */}
+          <Route
+            path="/dept-admin"
+            element={
+              <ProtectedRoute>
+                <DepartmentAdminDashboard />
               </ProtectedRoute>
             }
           />

@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['admin', 'staff', 'student'],
+    enum: ['admin', 'department_admin', 'staff', 'student'],
     default: 'student',
   },
   // Staff-specific fields
@@ -17,7 +17,8 @@ const userSchema = new mongoose.Schema({
     subjectCode: { type: String },
     subjectName: { type: String },
     year: { type: String },
-    department: { type: String }
+    department: { type: String },
+    section: { type: String }
   }],
   // Student-specific fields
   regulation: { type: String, default: '' },

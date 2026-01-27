@@ -14,7 +14,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user._id, role: user.role, staffDepartment: user.staffDepartment },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
@@ -34,10 +34,67 @@ router.get('/me', authMiddleware.isAuthenticated, async (req, res) => {
   }
 });
 
-// Admin: Create Staff account
-router.post('/create-staff', authMiddleware.isAdmin, async (req, res) => {
+// Admin: Create Department Admin
+router.post('/create-dept-admin', authMiddleware.isAdmin, async (req, res) => {
   try {
-    const { staffName, username, password, staffDepartment } = req.body;
+    const { username, password, department } = req.body;
+
+    // Check if username already exists
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    const deptAdmin = new User({
+      username,
+      password,
+      role: 'department_admin',
+      staffDepartment: department, // Use staffDepartment for Dept Admin's department
+      createdBy: req.user.userId
+    });
+    await deptAdmin.save();
+    res.status(201).json({
+      message: 'Department Admin created successfully',
+      user: { _id: deptAdmin._id, username, role: 'department_admin', department }
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Admin: Get all Department Admins
+router.get('/dept-admins', authMiddleware.isAdmin, async (req, res) => {
+  try {
+    const admins = await User.find({ role: 'department_admin' }, 'username staffDepartment createdAt');
+    res.json(admins);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Admin: Delete Department Admin
+router.delete('/dept-admin/:id', authMiddleware.isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+
+    if (!user || user.role !== 'department_admin') {
+      return res.status(404).json({ error: 'Department Admin not found' });
+    }
+
+    await User.findByIdAndDelete(id);
+    res.json({ message: 'Department Admin deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Department Admin: Create Staff account
+router.post('/create-staff', authMiddleware.isDepartmentAdmin, async (req, res) => {
+  try {
+    const { staffName, username, password, subjects } = req.body;
+    console.log('CREATE STAFF REQUEST:', req.body);
+    console.log('Creator:', req.user.userId);
 
     // Check if username already exists
     const existingUser = await User.findOne({ username });
@@ -46,7 +103,6 @@ router.post('/create-staff', authMiddleware.isAdmin, async (req, res) => {
     }
 
     // Auto-generate Staff ID starting with 'ests'
-    // Find the highest existing staff ID number
     const lastStaff = await User.findOne({
       role: 'staff',
       staffId: { $regex: /^ests\d+$/i }
@@ -61,28 +117,32 @@ router.post('/create-staff', authMiddleware.isAdmin, async (req, res) => {
     }
     const staffId = `ests${String(nextNumber).padStart(3, '0')}`;
 
+    // Fetch creator to get department
+    const creator = await User.findById(req.user.userId);
+    const department = creator.staffDepartment;
+
     const staff = new User({
       staffName: staffName || '',
       staffId: staffId,
       username,
       password,
       role: 'staff',
-      staffDepartment: staffDepartment || '',
-      subjects: [],
+      staffDepartment: department,
+      subjects: subjects || [],
       createdBy: req.user.userId
     });
     await staff.save();
     res.status(201).json({
       message: 'Staff account created successfully',
-      user: { _id: staff._id, staffName, staffId, username, role: 'staff', staffDepartment }
+      user: { _id: staff._id, staffName, staffId, username, role: 'staff', staffDepartment: department }
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// Admin: Edit Staff (update staffId, staffName, staffDepartment, subjects)
-router.put('/staff/:id', authMiddleware.isAdmin, async (req, res) => {
+// Admin & Dept Admin: Edit Staff (update staffId, staffName, staffDepartment, subjects)
+router.put('/staff/:id', authMiddleware.isAdminOrDepartmentAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const body = req.body;
@@ -95,6 +155,18 @@ router.put('/staff/:id', authMiddleware.isAdmin, async (req, res) => {
     const staff = await User.findOne({ _id: id, role: 'staff' });
     if (!staff) {
       return res.status(404).json({ error: 'Staff not found' });
+    }
+
+    // If Department Admin, check if staff belongs to their department
+    if (req.user.role === 'department_admin') {
+      const currentUser = await User.findById(req.user.userId);
+      if (!currentUser.staffDepartment || currentUser.staffDepartment !== staff.staffDepartment) {
+        return res.status(403).json({ error: 'You can only edit staff in your department' });
+      }
+      // Prevent changing department
+      if (body.staffDepartment && body.staffDepartment !== staff.staffDepartment) {
+        return res.status(403).json({ error: 'You cannot change the department of a staff member' });
+      }
     }
 
     console.log('Before update - staffDepartment:', staff.staffDepartment);
@@ -137,16 +209,27 @@ router.put('/staff/:id', authMiddleware.isAdmin, async (req, res) => {
   }
 });
 
-// Admin: Get all staff with search/filter by department and year
-router.get('/staff', authMiddleware.isAdmin, async (req, res) => {
+// Admin & Dept Admin: Get all staff with search/filter by department and year
+router.get('/staff', authMiddleware.isAdminOrDepartmentAdmin, async (req, res) => {
   try {
     const { search, department, year } = req.query;
 
     let query = { role: 'staff' };
     let andConditions = [];
 
-    // Filter by department in subjects
-    if (department) {
+    console.log('GET STAFF REQUEST user:', req.user);
+    console.log('Department filter:', department);
+
+    // If Department Admin, enforce their department
+    if (req.user.role === 'department_admin') {
+      const currentUser = await User.findById(req.user.userId);
+      if (currentUser && currentUser.staffDepartment) {
+        andConditions.push({
+          staffDepartment: { $regex: new RegExp(currentUser.staffDepartment.trim(), 'i') }
+        });
+      }
+    } else if (department) {
+      // If Admin and department filter provided
       andConditions.push({
         $or: [
           { 'subjects.department': { $regex: department, $options: 'i' } },
@@ -181,7 +264,10 @@ router.get('/staff', authMiddleware.isAdmin, async (req, res) => {
       query.$and = andConditions;
     }
 
+    console.log('FINAL STAFF QUERY:', JSON.stringify(query, null, 2));
+
     const staff = await User.find(query, 'username staffName staffId staffDepartment subjects role createdAt');
+    console.log('FOUND STAFF COUNT:', staff.length);
     res.json(staff);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -315,14 +401,22 @@ router.put('/student/:id', authMiddleware.isStaff, async (req, res) => {
   }
 });
 
-// Admin: Delete staff
-router.delete('/staff/:id', authMiddleware.isAdmin, async (req, res) => {
+// Admin & Dept Admin: Delete staff
+router.delete('/staff/:id', authMiddleware.isAdminOrDepartmentAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
 
     if (!user || user.role !== 'staff') {
       return res.status(404).json({ error: 'Staff not found' });
+    }
+
+    // If Department Admin, check if staff belongs to their department
+    if (req.user.role === 'department_admin') {
+      const currentUser = await User.findById(req.user.userId);
+      if (!currentUser.staffDepartment || currentUser.staffDepartment !== user.staffDepartment) {
+        return res.status(403).json({ error: 'You can only delete staff in your department' });
+      }
     }
 
     await User.findByIdAndDelete(id);

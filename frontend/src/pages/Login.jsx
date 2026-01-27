@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BASE_URL } from '../api/config';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,25 @@ const Login = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  // If user is already logged in, redirect to their dashboard
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const role = localStorage.getItem('role');
+
+    if (token) {
+      if (role === 'admin') {
+        navigate('/admin');
+      } else if (role === 'department_admin') {
+        navigate('/dept-admin');
+      } else if (role === 'staff') {
+        navigate('/staff');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [navigate]);
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,6 +51,8 @@ const Login = () => {
       // Redirect based on role from database
       if (role === 'admin') {
         navigate('/admin');
+      } else if (role === 'department_admin') {
+        navigate('/dept-admin');
       } else if (role === 'staff') {
         navigate('/staff');
       } else {
@@ -111,8 +132,8 @@ const Login = () => {
 
               {message && (
                 <p className={`text-center text-sm mt-3 p-3 rounded-lg ${message.includes('successful')
-                    ? 'text-green-700 bg-green-50'
-                    : 'text-red-600 bg-red-50'
+                  ? 'text-green-700 bg-green-50'
+                  : 'text-red-600 bg-red-50'
                   }`}>
                   {message}
                 </p>

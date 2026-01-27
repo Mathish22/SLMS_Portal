@@ -18,6 +18,7 @@ const Navbar = () => {
   // Determine dashboard link based on role
   const getDashboardLink = () => {
     if (role === 'admin') return '/admin';
+    if (role === 'department_admin') return '/dept-admin';
     if (role === 'staff') return '/staff';
     return '/dashboard';
   };
@@ -62,10 +63,11 @@ const Navbar = () => {
                   {/* Role Badge */}
                   <li className="hidden md:block">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                      role === 'staff' ? 'bg-blue-100 text-blue-700' :
-                        'bg-green-100 text-green-700'
+                      role === 'department_admin' ? 'bg-indigo-100 text-indigo-700' :
+                        role === 'staff' ? 'bg-blue-100 text-blue-700' :
+                          'bg-green-100 text-green-700'
                       }`}>
-                      {role?.charAt(0).toUpperCase() + role?.slice(1)}
+                      {role?.charAt(0).toUpperCase() + role?.slice(1).replace('_', ' ')}
                     </span>
                   </li>
 
@@ -76,8 +78,8 @@ const Navbar = () => {
                     </Link>
                   </li>
 
-                  {/* Resources - for staff and admin */}
-                  {(role === 'admin' || role === 'staff') && (
+                  {/* Resources - for staff, admin and dept admin */}
+                  {(role === 'admin' || role === 'staff' || role === 'department_admin') && (
                     <li>
                       <Link to="/dashboard" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
                         <i className="fas fa-book mr-2"></i>Resources

@@ -1,8 +1,28 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaBookOpen, FaDownload, FaUsers } from 'react-icons/fa';
 
 const Home = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const role = localStorage.getItem('role');
+
+    // If user is already logged in, redirect to their dashboard
+    if (token) {
+      if (role === 'admin') {
+        navigate('/admin');
+      } else if (role === 'department_admin') {
+        navigate('/dept-admin');
+      } else if (role === 'staff') {
+        navigate('/staff');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [navigate]);
+
   return (
     <div className="min-h-screen flex flex-col justify-between  text-gray-800">
       {/* Hero Section */}

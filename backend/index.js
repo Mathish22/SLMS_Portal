@@ -23,6 +23,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
+app.use('/api/subjects', require('./routes/subjects'));
 
 // Serve frontend (React build) if exists in 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));

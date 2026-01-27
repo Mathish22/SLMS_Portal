@@ -59,6 +59,27 @@ const authMiddleware = {
       }
     });
   },
+  // Check if department admin
+  isDepartmentAdmin: (req, res, next) => {
+    authMiddleware.verifyToken(req, res, () => {
+      if (req.user.role === 'department_admin') {
+        next();
+      } else {
+        res.status(403).json({ message: 'Department Admin access required' });
+      }
+    });
+  },
+
+  // Check if admin or department admin
+  isAdminOrDepartmentAdmin: (req, res, next) => {
+    authMiddleware.verifyToken(req, res, () => {
+      if (['admin', 'department_admin'].includes(req.user.role)) {
+        next();
+      } else {
+        res.status(403).json({ message: 'Admin or Department Admin access required' });
+      }
+    });
+  },
 };
 
 module.exports = authMiddleware;
