@@ -1,0 +1,9 @@
+2026-02-12T07:15:56.577Z: Multer Upload Error: "Must supply api_key"
+2026-02-12T07:19:57.040Z: --- Upload Request ---
+2026-02-12T07:19:57.042Z: Body: {"title":"Backend Test","subjectCode":"TEST","year":"IV"}
+2026-02-12T07:19:57.043Z: File: test_dummy-1770880797034.pdf
+2026-02-12T07:19:57.068Z: Resource saved successfully. ID: 698d7f1d972c8f66965d1998
+2026-02-12T07:25:23.492Z: --- Upload Request ---
+2026-02-12T07:25:23.492Z: Body: {"title":"Basics of the BCT","year":"IV","subjectCode":"19ITX12"}
+2026-02-12T07:25:23.493Z: File: BCT_sample-1770881123446.pdf
+2026-02-12T07:25:23.497Z: Resource saved successfully. ID: 698d8063972c8f66965d199a

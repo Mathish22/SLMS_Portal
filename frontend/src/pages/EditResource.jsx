@@ -140,7 +140,7 @@ const EditResource = () => {
               />
               {!file && resource.filePath && (
                 <p className="text-sm text-gray-600 mt-2">
-                  Current file: <a href={resource.filePath} target="_blank" rel="noreferrer" className="text-orange-500 underline">View current file</a>
+                  Current file: <a href={resource.filePath.startsWith('http') ? resource.filePath : `${BASE_URL.replace('/api', '')}${resource.filePath}`} target="_blank" rel="noreferrer" className="text-orange-500 underline">View current file</a>
                 </p>
               )}
               {file && <p className="text-sm text-gray-500 mt-1">{file.name}</p>}

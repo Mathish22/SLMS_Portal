@@ -36,7 +36,6 @@ const StaffDashboard = () => {
         { id: 'study-resources', label: '📚 Study Resources', icon: '📚' },
         { id: 'exam', label: '📝 Exam', icon: '📝' },
         { id: 'student-answers', label: '📄 Student Answers', icon: '📄' },
-        { id: 'students', label: '🎓 Students', icon: '🎓' },
     ];
 
     const departments = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AIDS', 'AIML'];

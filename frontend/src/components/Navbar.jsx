@@ -78,8 +78,8 @@ const Navbar = () => {
                     </Link>
                   </li>
 
-                  {/* Resources - for staff, admin and dept admin */}
-                  {(role === 'admin' || role === 'staff' || role === 'department_admin') && (
+                  {/* Resources - for staff only */}
+                  {role === 'staff' && (
                     <li>
                       <Link to="/dashboard" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
                         <i className="fas fa-book mr-2"></i>Resources

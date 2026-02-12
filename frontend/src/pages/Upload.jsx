@@ -18,39 +18,48 @@ const Upload = () => {
   const [loading, setLoading] = useState(false);
   const [showExamTypeSuggestions, setShowExamTypeSuggestions] = useState(false);
   const [showYearSuggestions, setShowYearSuggestions] = useState(false);
+  const [assignedSubjects, setAssignedSubjects] = useState([]);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      try {
+        const res = await axios.get(`${BASE_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data.subjects && res.data.subjects.length > 0) {
+          setAssignedSubjects(res.data.subjects);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user details", err);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const examTypeSuggestions = ['CAT-1', 'CAT-2', 'CAT-3', 'Model'];
   const regulationOptions = ['2021', '2022', '2023', '2024', '2025'];
   const currentYear = new Date().getFullYear();
   const yearSuggestions = [currentYear, currentYear - 1, currentYear - 2];
 
-  const examTypeRef = useRef(null);
-  const yearRef = useRef(null);
-
   // Close suggestions when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        examTypeRef.current &&
-        !examTypeRef.current.contains(event.target)
-      ) {
-        setShowExamTypeSuggestions(false);
-      }
-      if (
-        yearRef.current &&
-        !yearRef.current.contains(event.target)
-      ) {
-        setShowYearSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // No suggestions to close anymore
   }, []);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === 'file') {
       setFormData({ ...formData, file: files[0] });
+    } else if (name === 'subjectCode') {
+      // Check if this is a selection from assigned subjects
+      const selectedSubject = assignedSubjects.find(sub => sub.subjectCode === value);
+      if (selectedSubject) {
+        setFormData({ ...formData, subjectCode: value, year: selectedSubject.year || '' });
+      } else {
+        setFormData({ ...formData, subjectCode: value });
+      }
     } else {
       setFormData({ ...formData, [name]: value });
     }
@@ -72,8 +81,8 @@ const Upload = () => {
       return;
     }
 
-    const { title, year, subjectCode, examType, file } = formData;
-    if (!title || !year || !subjectCode || !examType || !file) {
+    const { title, year, subjectCode, file } = formData;
+    if (!title || !year || !subjectCode || !file) {
       setError('All fields are required.');
       setLoading(false);
       return;
@@ -83,15 +92,16 @@ const Upload = () => {
     formDataToSend.append('title', title);
     formDataToSend.append('year', year);
     formDataToSend.append('subjectCode', subjectCode);
-    formDataToSend.append('examType', examType);
-    formDataToSend.append('regulation', formData.regulation);
     formDataToSend.append('file', file);
+    // Optional fields
+    if (formData.examType) formDataToSend.append('examType', formData.examType);
+    if (formData.regulation) formDataToSend.append('regulation', formData.regulation);
 
     try {
       const response = await axios.post(`${BASE_URL}/resources/upload`, formDataToSend, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
+          // Let axios set the Content-Type with the boundary for FormData
         },
       });
 
@@ -153,8 +163,8 @@ const Upload = () => {
               />
             </div>
 
-            {/* Year with Suggestions */}
-            <div className="relative" ref={yearRef}>
+            {/* Year */}
+            <div>
               <label htmlFor="year" className="block font-semibold text-gray-700 mb-1">
                 Year
               </label>
@@ -163,24 +173,10 @@ const Upload = () => {
                 name="year"
                 value={formData.year}
                 onChange={handleChange}
-                onFocus={() => setShowYearSuggestions(true)}
-                autoComplete="off"
+                placeholder="e.g. IV"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
               />
-              {showYearSuggestions && (
-                <ul className="absolute bg-white border border-gray-200 rounded-md mt-1 w-full z-10">
-                  {yearSuggestions.map((year) => (
-                    <li
-                      key={year}
-                      className="px-4 py-2 cursor-pointer hover:bg-orange-100 text-sm"
-                      onMouseDown={() => selectSuggestion('year', year)}
-                    >
-                      {year}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
 
             {/* Subject Code */}
@@ -188,64 +184,32 @@ const Upload = () => {
               <label htmlFor="subjectCode" className="block font-semibold text-gray-700 mb-1">
                 Subject Code
               </label>
-              <input
-                type="text"
-                name="subjectCode"
-                value={formData.subjectCode}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
-              />
-            </div>
-
-            {/* Exam Type with Suggestions */}
-            <div className="relative" ref={examTypeRef}>
-              <label htmlFor="examType" className="block font-semibold text-gray-700 mb-1">
-                Exam Type
-              </label>
-              <input
-                type="text"
-                name="examType"
-                value={formData.examType}
-                onChange={handleChange}
-                onFocus={() => setShowExamTypeSuggestions(true)}
-                autoComplete="off"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
-              />
-              {showExamTypeSuggestions && (
-                <ul className="absolute bg-white border border-gray-200 rounded-md mt-1 w-full z-10">
-                  {examTypeSuggestions.map((type) => (
-                    <li
-                      key={type}
-                      className="px-4 py-2 cursor-pointer hover:bg-orange-100 text-sm"
-                      onMouseDown={() => selectSuggestion('examType', type)}
-                    >
-                      {type}
-                    </li>
+              {assignedSubjects.length > 0 ? (
+                <select
+                  name="subjectCode"
+                  value={formData.subjectCode}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
+                >
+                  <option value="">Select Assigned Subject</option>
+                  {[...new Map(assignedSubjects.map(sub => [sub.subjectCode, sub])).values()].map((sub, idx) => (
+                    <option key={idx} value={sub.subjectCode}>
+                      {sub.subjectName} ({sub.subjectCode})
+                    </option>
                   ))}
-                </ul>
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name="subjectCode"
+                  value={formData.subjectCode}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
+                  placeholder="Enter Subject Code"
+                />
               )}
-            </div>
-
-            {/* Regulation Dropdown */}
-            <div>
-              <label htmlFor="regulation" className="block font-semibold text-gray-700 mb-1">
-                Target Regulation
-              </label>
-              <select
-                name="regulation"
-                value={formData.regulation}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
-              >
-                <option value="">Select Regulation</option>
-                {regulationOptions.map((reg) => (
-                  <option key={reg} value={reg}>{reg}</option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">Students with this regulation will see this material</p>
             </div>
 
             {/* File Upload */}

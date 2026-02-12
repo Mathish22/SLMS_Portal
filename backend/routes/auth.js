@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
 // Get current user info
 router.get('/me', authMiddleware.isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId, 'username role staffName staffId subjects');
+    const user = await User.findById(req.user.userId, 'username role staffName staffId subjects department year section rollNo regNo');
     res.json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -275,14 +275,18 @@ router.get('/staff', authMiddleware.isAdminOrDepartmentAdmin, async (req, res) =
 });
 
 // Staff: Create Student account
-router.post('/create-student', authMiddleware.isStaff, async (req, res) => {
+// Department Admin: Create Student account
+router.post('/create-student', authMiddleware.isDepartmentAdmin, async (req, res) => {
   try {
-    const { username, password, regulation, studentName, rollNo, department, year } = req.body;
+    const { studentName, rollNo, regNo, year, section } = req.body;
 
-    // Check if username already exists
+    const username = regNo;
+    const password = rollNo;
+
+    // Check if username/regNo already exists
     const existingUser = await User.findOne({ username });
     if (existingUser) {
-      return res.status(400).json({ error: 'Username already exists' });
+      return res.status(400).json({ error: 'Registration Number (Username) already exists' });
     }
 
     // Check if roll number already exists
@@ -293,15 +297,20 @@ router.post('/create-student', authMiddleware.isStaff, async (req, res) => {
       }
     }
 
+    // Fetch creator to get department
+    const creator = await User.findById(req.user.userId);
+    const department = creator.staffDepartment;
+
     const student = new User({
       username,
       password,
       role: 'student',
-      regulation: regulation || '',
       studentName: studentName || '',
       rollNo: rollNo || '',
+      regNo: regNo || '',
       department: department || '',
       year: year || '',
+      section: section || '',
       createdBy: req.user.userId
     });
     await student.save();
@@ -310,12 +319,12 @@ router.post('/create-student', authMiddleware.isStaff, async (req, res) => {
       user: {
         _id: student._id,
         username,
-        role: 'student',
-        regulation,
         studentName,
         rollNo,
+        regNo,
         department,
-        year
+        year,
+        section
       }
     });
   } catch (error) {
@@ -324,63 +333,83 @@ router.post('/create-student', authMiddleware.isStaff, async (req, res) => {
 });
 
 // Staff: Get all students with search
-router.get('/students', authMiddleware.isStaff, async (req, res) => {
+// Department Admin: Get all students
+router.get('/students', authMiddleware.isDepartmentAdmin, async (req, res) => {
   try {
     const { search } = req.query;
-    let query = { role: 'student' };
+
+    // Fetch creator to get department
+    const creator = await User.findById(req.user.userId);
+    const department = creator.staffDepartment;
+
+    let query = {
+      role: 'student',
+      department: { $regex: new RegExp(department.trim(), 'i') }
+    };
 
     // If search term provided, filter by multiple fields
     if (search) {
-      query.$or = [
-        { studentName: { $regex: search, $options: 'i' } },
-        { rollNo: { $regex: search, $options: 'i' } },
-        { department: { $regex: search, $options: 'i' } },
-        { year: { $regex: search, $options: 'i' } },
-        { username: { $regex: search, $options: 'i' } },
-        { regulation: { $regex: search, $options: 'i' } }
+      query.$and = [
+        {
+          $or: [
+            { studentName: { $regex: search, $options: 'i' } },
+            { rollNo: { $regex: search, $options: 'i' } },
+            { regNo: { $regex: search, $options: 'i' } },
+            { year: { $regex: search, $options: 'i' } },
+            { section: { $regex: search, $options: 'i' } }
+          ]
+        }
       ];
     }
 
-    const students = await User.find(query, 'username role regulation studentName rollNo department year createdAt');
+    const students = await User.find(query, 'username role studentName rollNo regNo department year section createdAt')
+      .sort({ year: 1, studentName: 1 });
     res.json(students);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// Staff: Update student
-router.put('/student/:id', authMiddleware.isStaff, async (req, res) => {
+// Department Admin: Update student
+router.put('/student/:id', authMiddleware.isDepartmentAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, regulation, studentName, rollNo, department, year } = req.body;
+    const { studentName, rollNo, regNo, year, section } = req.body;
 
     const student = await User.findById(id);
     if (!student || student.role !== 'student') {
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    // Check if username already exists (if changing username)
-    if (username && username !== student.username) {
-      const existingUser = await User.findOne({ username });
-      if (existingUser) {
-        return res.status(400).json({ error: 'Username already exists' });
-      }
-      student.username = username;
+    // Check Dept Admin ownership
+    const creator = await User.findById(req.user.userId);
+    if (student.department !== creator.staffDepartment) {
+      return res.status(403).json({ error: 'You can only edit students in your department' });
     }
 
-    // Check if roll number already exists (if changing rollNo)
+    // Update RegNo/Username
+    if (regNo && regNo !== student.regNo) {
+      const existingUser = await User.findOne({ username: regNo });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Registration Number already exists' });
+      }
+      student.regNo = regNo;
+      student.username = regNo; // Sync username
+    }
+
+    // Update RollNo/Password
     if (rollNo && rollNo !== student.rollNo) {
       const existingRollNo = await User.findOne({ rollNo });
       if (existingRollNo) {
         return res.status(400).json({ error: 'Roll number already exists' });
       }
       student.rollNo = rollNo;
+      student.password = rollNo; // Sync password (will be hashed by pre-save)
     }
 
-    if (regulation !== undefined) student.regulation = regulation;
     if (studentName !== undefined) student.studentName = studentName;
-    if (department !== undefined) student.department = department;
     if (year !== undefined) student.year = year;
+    if (section !== undefined) student.section = section;
 
     await student.save();
     res.json({
@@ -388,12 +417,12 @@ router.put('/student/:id', authMiddleware.isStaff, async (req, res) => {
       user: {
         _id: student._id,
         username: student.username,
-        role: student.role,
-        regulation: student.regulation,
         studentName: student.studentName,
         rollNo: student.rollNo,
+        regNo: student.regNo,
         department: student.department,
-        year: student.year
+        year: student.year,
+        section: student.section
       }
     });
   } catch (error) {
@@ -426,14 +455,20 @@ router.delete('/staff/:id', authMiddleware.isAdminOrDepartmentAdmin, async (req,
   }
 });
 
-// Staff: Delete student
-router.delete('/student/:id', authMiddleware.isStaff, async (req, res) => {
+// Department Admin: Delete student
+router.delete('/student/:id', authMiddleware.isDepartmentAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id);
+    const student = await User.findById(id);
 
-    if (!user || user.role !== 'student') {
+    if (!student || student.role !== 'student') {
       return res.status(404).json({ error: 'Student not found' });
+    }
+
+    // Check Dept Admin ownership
+    const creator = await User.findById(req.user.userId);
+    if (student.department !== creator.staffDepartment) {
+      return res.status(403).json({ error: 'You can only delete students in your department' });
     }
 
     await User.findByIdAndDelete(id);

@@ -24,8 +24,10 @@ const userSchema = new mongoose.Schema({
   regulation: { type: String, default: '' },
   studentName: { type: String, default: '' },
   rollNo: { type: String, default: '' },
+  regNo: { type: String, default: '' },
   department: { type: String, default: '' },
   year: { type: String, default: '' },
+  section: { type: String, default: '' },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

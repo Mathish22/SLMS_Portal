@@ -1,6 +1,5 @@
 const express = require('express');
-const multer = require('multer');
-const { storage, cloudinary } = require('../config/cloudinary'); // cloudinary config
+// cloudinary config removed, using config/upload.js
 const Resource = require('../models/Resource');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
@@ -8,7 +7,14 @@ const path = require('path');
 const { URL } = require('url');
 
 const router = express.Router();
-const upload = multer({ storage });
+const { upload, uploader, useCloudinary } = require('../config/upload');
+const fs = require('fs');
+// path already imported above
+
+const logToFile = (msg) => {
+  const logPath = path.join(__dirname, '../server_debug.log');
+  fs.appendFileSync(logPath, new Date().toISOString() + ': ' + msg + '\n');
+};
 
 // Get all resources (filtered by regulation for students)
 router.get('/', authMiddleware.isAuthenticated, async (req, res) => {
@@ -33,32 +39,60 @@ router.post(
   '/upload',
   authMiddleware.isAuthenticated,
   authMiddleware.isStaff,
-  upload.single('file'),
+  (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) {
+        logToFile('Multer Upload Error: ' + JSON.stringify(err));
+        return res.status(400).json({ error: err.message || 'Multer Error' });
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
+      logToFile('--- Upload Request ---');
+      logToFile('Body: ' + JSON.stringify(req.body));
+      logToFile('File: ' + (req.file ? req.file.filename : 'No File'));
+
       const { title, year, subjectCode, examType, regulation } = req.body;
-      if (!title || !year || !subjectCode || !examType || !req.file) {
-        return res.status(400).json({ error: 'All fields are required' });
+
+      // Detailed validation logging
+      if (!title || !year || !subjectCode || !req.file) {
+        const missing = [];
+        if (!title) missing.push('title');
+        if (!year) missing.push('year');
+        if (!subjectCode) missing.push('subjectCode');
+        if (!req.file) missing.push('file');
+        logToFile('Upload Validation Failed. Missing: ' + missing.join(', '));
+        return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+      }
+
+      let filePath = req.file.path;
+      // If local storage, convert absolute path to relative URL
+      if (!useCloudinary) {
+        filePath = `/uploads/${req.file.filename}`;
       }
 
       const resource = new Resource({
         title,
         year,
         subjectCode,
-        examType,
+        examType: examType || 'General',
         regulation: regulation || '',
-        filePath: req.file.path,
+        filePath: filePath,
         cloudinaryId: req.file.filename,
         uploadedBy: req.user.userId
       });
 
       await resource.save();
+      logToFile('Resource saved successfully. ID: ' + resource._id);
 
       res.status(201).json({
         message: 'Resource uploaded successfully',
         fileUrl: resource.filePath,
       });
     } catch (error) {
+      logToFile('Upload Exception: ' + error.message);
       res.status(400).json({ error: error.message });
     }
   }
@@ -96,14 +130,17 @@ router.put(
       // 🧼 Replace PDF if new file uploaded
       if (req.file) {
         // ✅ Delete old file from Cloudinary
+        // ✅ Delete old file
         if (resource.cloudinaryId) {
-          await cloudinary.uploader.destroy(resource.cloudinaryId, {
-            resource_type: 'raw',
-          });
+          await uploader.destroy(resource.cloudinaryId);
         }
 
         // ✅ Save new file details
-        resource.filePath = req.file.path;
+        let newFilePath = req.file.path;
+        if (!useCloudinary) {
+          newFilePath = `/uploads/${req.file.filename}`;
+        }
+        resource.filePath = newFilePath;
         resource.cloudinaryId = req.file.filename;
       }
 
@@ -123,7 +160,7 @@ router.put(
 
 // Delete a resource
 
-router.delete('/:id', authMiddleware.isAuthenticated, authMiddleware.isAdmin, async (req, res) => {
+router.delete('/:id', authMiddleware.isAuthenticated, authMiddleware.isStaffOrAdmin, async (req, res) => {
   try {
     // Find the resource in MongoDB
     const resource = await Resource.findById(req.params.id);
@@ -131,15 +168,23 @@ router.delete('/:id', authMiddleware.isAuthenticated, authMiddleware.isAdmin, as
       return res.status(404).json({ error: 'Resource not found' });
     }
 
+    // Check for "Staff" role ownership
+    if (req.user.role === 'staff' && resource.uploadedBy.toString() !== req.user.userId) {
+      return res.status(403).json({ error: 'You can only delete resources you uploaded' });
+    }
+
+    // Check for "Department Admin" role ownership (if enforced, currently they can delete any?)
+    // Let's assume Dept Admin can delete any resource (or at least filtering by dept is good but resources don't have dept field explicit, just subjectCode)
+    // For now, allow Dept Admin to delete any resource as per current implied logic (or consistent with plan).
+    // The plan said: "Department Admins and Admins can delete any resource".
+
     // Construct public_id using folder and saved filename (cloudinaryId)
     const publicId = resource.cloudinaryId;
 
     console.log('➡️ Deleting from Cloudinary:', publicId);
 
-    // Delete file from Cloudinary (for non-images: use `resource_type: 'raw'`)
-    const result = await cloudinary.uploader.destroy(publicId, {
-      resource_type: 'raw',
-    });
+    // Delete file (using unified uploader)
+    const result = await uploader.destroy(publicId);
 
     console.log('✅ Cloudinary response:', result);
 

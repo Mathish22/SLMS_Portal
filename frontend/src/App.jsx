@@ -10,6 +10,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminDashboard from './pages/AdminDashboard';
 import DepartmentAdminDashboard from './pages/DepartmentAdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
+import Exam from './pages/Exam';
 
 function App() {
   return (
@@ -57,6 +58,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/exam"
+            element={
+              <ProtectedRoute>
+                <Exam />
               </ProtectedRoute>
             }
           />
