@@ -5,7 +5,12 @@ import { useNavigate } from 'react-router-dom';
 
 const StaffDashboard = () => {
     const [activeTab, setActiveTab] = useState('study-resources');
+    const [currentUser, setCurrentUser] = useState(null);
     const [students, setStudents] = useState([]);
+    const [studentAttempts, setStudentAttempts] = useState([]);
+    const [selectedAttempt, setSelectedAttempt] = useState(null);
+    const [showAttemptModal, setShowAttemptModal] = useState(false);
+    
     const [newStudent, setNewStudent] = useState({
         username: '',
         password: '',
@@ -35,19 +40,53 @@ const StaffDashboard = () => {
     const tabs = [
         { id: 'study-resources', label: '📚 Study Resources', icon: '📚' },
         { id: 'exam', label: '📝 Exam', icon: '📝' },
+        { id: 'tasks', label: '✅ Tasks', icon: '✅' },
         { id: 'student-answers', label: '📄 Student Answers', icon: '📄' },
     ];
+
+    if (currentUser?.advisingSections?.length > 0 || role === 'department_admin') {
+        tabs.push({ id: 'attendance', label: '🗓️ Attendance', icon: '🗓️' });
+    }
 
     const departments = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AIDS', 'AIML'];
     const years = ['I', 'II', 'III', 'IV'];
 
     useEffect(() => {
-        if (role !== 'staff') {
+        if (!['staff', 'department_admin'].includes(role)) {
             navigate('/login');
             return;
         }
+        fetchCurrentUser();
         fetchStudents();
     }, []);
+
+    useEffect(() => {
+        if (activeTab === 'student-answers') {
+            fetchAttempts();
+        }
+    }, [activeTab]);
+
+    const fetchCurrentUser = async () => {
+        try {
+            const res = await axios.get(`${BASE_URL}/auth/me`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setCurrentUser(res.data);
+        } catch (error) {
+            console.error('Failed to fetch user', error);
+        }
+    };
+
+    const fetchAttempts = async () => {
+        try {
+            const res = await axios.get(`${BASE_URL}/exams/attempts`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setStudentAttempts(res.data);
+        } catch (error) {
+            console.error('Failed to fetch attempts', error);
+        }
+    };
 
     const fetchStudents = async (search = '') => {
         try {
@@ -195,8 +234,34 @@ const StaffDashboard = () => {
                 <p className="text-gray-500">Create and manage exams for students</p>
             </div>
 
-            <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-yellow-700 text-center">🚧 Exam feature coming soon!</p>
+            <div className="flex justify-center mt-8">
+                <button
+                    onClick={() => navigate('/staff/exams')}
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+                >
+                    <span className="text-xl">⚙️</span> Manage Exams & Questions
+                </button>
+            </div>
+        </div>
+    );
+
+    // Render Tasks Tab
+    const renderTasks = () => (
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4 text-white">
+                    <span className="text-4xl">✅</span>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Tasks Assignment</h2>
+                <p className="text-gray-500">Assign tasks and view student submissions</p>
+            </div>
+            <div className="flex justify-center mt-8">
+                <button
+                    onClick={() => navigate('/staff/tasks')}
+                    className="bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-lg flex items-center gap-2"
+                >
+                    <span className="text-xl">⚙️</span> Manage Tasks
+                </button>
             </div>
         </div>
     );
@@ -204,16 +269,91 @@ const StaffDashboard = () => {
     // Render Student Answers Tab
     const renderStudentAnswers = () => (
         <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="text-center mb-8">
-                <div className="w-20 h-20 bg-gradient-to-r from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-4xl">📄</span>
+            <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-gradient-to-r from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
+                        <span className="text-3xl">📄</span>
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Student Answers</h2>
+                        <p className="text-gray-500">Review and grade {studentAttempts.length} submissions</p>
+                    </div>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Student Answers</h2>
-                <p className="text-gray-500">Review and grade student submissions</p>
+                <button 
+                    onClick={fetchAttempts}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                >
+                    🔄 Refresh
+                </button>
             </div>
 
-            <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-yellow-700 text-center">🚧 Student Answers feature coming soon!</p>
+            {studentAttempts.length === 0 ? (
+                <div className="p-12 text-center text-gray-500 border border-gray-100 rounded-xl bg-gray-50">
+                    <span className="text-4xl mb-4 block">📭</span>
+                    No student submissions found for your exams yet.
+                </div>
+            ) : (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider cursor-pointer font-mono">Roll No</th>
+                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider">Student Name</th>
+                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider">Exam Title</th>
+                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider">Score</th>
+                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider">Submitted</th>
+                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {studentAttempts.map((attempt) => (
+                                <tr key={attempt._id} className="hover:bg-blue-50 transition-colors">
+                                    <td className="p-4 font-mono text-gray-800 font-medium">{attempt.studentId?.rollNo || attempt.studentId?.username || '-'}</td>
+                                    <td className="p-4 text-gray-800 font-medium">{attempt.studentId?.studentName || 'Unknown Student'}</td>
+                                    <td className="p-4 text-gray-600">{attempt.examId?.title || 'Deleted Exam'}</td>
+                                    <td className="p-4">
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                            (attempt.score / attempt.maxScore) >= 0.5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                        }`}>
+                                            {attempt.score} / {attempt.maxScore}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-sm text-gray-500">{new Date(attempt.submittedAt).toLocaleString()}</td>
+                                    <td className="p-4 text-right">
+                                        <button 
+                                            onClick={() => { setSelectedAttempt(attempt); setShowAttemptModal(true); }}
+                                            className="text-white bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                        >
+                                            View Answers
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+
+    // Render Attendance Tab
+    const renderAttendance = () => (
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-md">
+                    <span className="text-4xl">🗓️</span>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Class Attendance</h2>
+                <p className="text-gray-500">Record and review daily attendance for your assigned classes</p>
+            </div>
+
+            <div className="flex justify-center mt-8">
+                <button
+                    onClick={() => navigate('/staff/attendance')}
+                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+                >
+                    <span className="text-xl">📋</span> Take Attendance
+                </button>
             </div>
         </div>
     );
@@ -531,10 +671,123 @@ const StaffDashboard = () => {
                 <div className="transition-all">
                     {activeTab === 'study-resources' && renderStudyResources()}
                     {activeTab === 'exam' && renderExam()}
+                    {activeTab === 'tasks' && renderTasks()}
                     {activeTab === 'student-answers' && renderStudentAnswers()}
+                    {activeTab === 'attendance' && renderAttendance()}
                     {activeTab === 'students' && renderStudents()}
                 </div>
             </div>
+
+            {/* Answer Review Modal */}
+            {showAttemptModal && selectedAttempt && (
+                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                        
+                        {/* Modal Header */}
+                        <div className="bg-blue-600 p-6 rounded-t-2xl flex justify-between items-start text-white flex-shrink-0">
+                            <div>
+                                <h2 className="text-2xl font-bold mb-1">{selectedAttempt.studentId?.studentName}'s Submission</h2>
+                                <div className="text-blue-100 space-x-4 text-sm">
+                                    <span>Roll No: <strong className="text-white">{selectedAttempt.studentId?.rollNo || 'N/A'}</strong></span>
+                                    <span>|</span>
+                                    <span>Exam: <strong className="text-white">{selectedAttempt.examId?.title}</strong></span>
+                                    <span>|</span>
+                                    <span>Submitted: {new Date(selectedAttempt.submittedAt).toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-3xl font-black mb-1">{selectedAttempt.score}/{selectedAttempt.maxScore}</div>
+                                <div className="text-blue-200 text-xs uppercase font-bold tracking-wider">Total Score</div>
+                            </div>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+                            {selectedAttempt.examId?.examType === 'Notepad' || selectedAttempt.notepadContent ? (
+                                <div className="bg-white border rounded-xl p-6 shadow-sm">
+                                    <h3 className="font-bold text-gray-800 mb-4 text-lg border-b pb-2">Notepad Response:</h3>
+                                    <pre className="whitespace-pre-wrap font-sans text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg border">
+                                        {selectedAttempt.notepadContent || '(No content submitted)'}
+                                    </pre>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {selectedAttempt.answers.map((ans, idx) => {
+                                        const q = ans.questionId;
+                                        if (!q) return <div key={idx} className="p-4 bg-red-50 text-red-500 rounded-lg">Question deleted from database.</div>;
+                                        
+                                        const isDescriptive = q.questionType === 'Descriptive';
+                                        const borderColor = isDescriptive ? 'border-blue-400' : (ans.isCorrect ? 'border-green-500' : 'border-red-500');
+
+                                        return (
+                                            <div key={idx} className={`bg-white rounded-xl shadow-sm border-l-4 p-5 ${borderColor}`}>
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <h3 className="text-lg font-medium text-gray-800 flex flex-col items-start gap-2">
+                                                        <div><span className="text-gray-400 mr-2">Q{idx + 1}.</span> {q.questionText}</div>
+                                                        <span className="text-xs font-bold text-gray-500 bg-gray-100 border px-2 py-1 rounded inline-block">{q.questionType || 'MCQ'}</span>
+                                                    </h3>
+                                                    {isDescriptive ? (
+                                                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center">
+                                                            Pending Grade
+                                                        </span>
+                                                    ) : (
+                                                        ans.isCorrect ? 
+                                                            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center"><span className="mr-1">✓</span> Correct</span> : 
+                                                            <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center"><span className="mr-1">✕</span> Incorrect</span>
+                                                    )}
+                                                </div>
+                                                
+                                                {isDescriptive ? (
+                                                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-700 font-mono text-sm whitespace-pre-wrap">
+                                                        {ans.selectedOption || '(No response provided)'}
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-8">
+                                                            {q.options.map((opt, oIdx) => {
+                                                                const isSelected = opt === ans.selectedOption;
+                                                                const isActuallyCorrect = opt === q.correctAnswer;
+                                                                
+                                                                let cardStyle = "bg-gray-50 border-gray-200 text-gray-600";
+                                                                if (isSelected && isActuallyCorrect) cardStyle = "bg-green-50 border-green-500 text-green-800 shadow-sm";
+                                                                if (isSelected && !isActuallyCorrect) cardStyle = "bg-red-50 border-red-500 text-red-800 shadow-sm";
+                                                                if (!isSelected && isActuallyCorrect) cardStyle = "bg-green-50 border-green-500 text-green-800 border-dashed opacity-80";
+
+                                                                return (
+                                                                    <div key={oIdx} className={`p-3 rounded-lg border-2 flex items-center ${cardStyle}`}>
+                                                                        <span className="w-6 font-bold opacity-50">{String.fromCharCode(65 + oIdx)}.</span>
+                                                                        <span className="flex-1 font-medium">{opt}</span>
+                                                                        {isSelected && <span className="ml-2 font-bold">{isActuallyCorrect ? '✓' : '✕'}</span>}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {!ans.isCorrect && (
+                                                            <div className="mt-4 pl-8 text-sm flex items-center text-gray-600 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                                                                <span className="font-bold text-yellow-700 mr-2">Correct Answer:</span> {q.correctAnswer}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t bg-white rounded-b-2xl flex justify-end flex-shrink-0">
+                            <button 
+                                onClick={() => { setShowAttemptModal(false); setSelectedAttempt(null); }}
+                                className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition-colors"
+                            >
+                                Close Review
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

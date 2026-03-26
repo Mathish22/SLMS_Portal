@@ -19,7 +19,7 @@ const Navbar = () => {
   const getDashboardLink = () => {
     if (role === 'admin') return '/admin';
     if (role === 'department_admin') return '/dept-admin';
-    if (role === 'staff') return '/staff';
+    if (role === 'staff') return '/staff/dashboard';
     return '/dashboard';
   };
 
@@ -78,8 +78,8 @@ const Navbar = () => {
                     </Link>
                   </li>
 
-                  {/* Resources - for staff only */}
-                  {role === 'staff' && (
+                  {/* Resources - for staff and department_admin */}
+                  {['staff', 'department_admin'].includes(role) && (
                     <li>
                       <Link to="/dashboard" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
                         <i className="fas fa-book mr-2"></i>Resources
@@ -87,8 +87,8 @@ const Navbar = () => {
                     </li>
                   )}
 
-                  {/* Upload - for staff only */}
-                  {role === 'staff' && (
+                  {/* Upload - for staff and department_admin */}
+                  {['staff', 'department_admin'].includes(role) && (
                     <li>
                       <Link to="/upload" className="text-gray-800 hover:text-orange-500 text-sm font-medium">
                         <i className="fas fa-upload mr-2"></i>Upload

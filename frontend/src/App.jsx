@@ -11,6 +11,11 @@ import AdminDashboard from './pages/AdminDashboard';
 import DepartmentAdminDashboard from './pages/DepartmentAdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import Exam from './pages/Exam';
+import ManageExams from './pages/ManageExams';
+import ManageQuestions from './pages/ManageQuestions';
+import ActiveExam from './pages/ActiveExam';
+import Attendance from './pages/Attendance';
+import ManageTasks from './pages/ManageTasks';
 
 function App() {
   return (
@@ -44,10 +49,45 @@ function App() {
 
           {/* Staff Dashboard */}
           <Route
-            path="/staff"
+            path="/staff/dashboard"
             element={
               <ProtectedRoute>
                 <StaffDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/attendance"
+            element={
+              <ProtectedRoute>
+                <Attendance />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/staff/exams"
+            element={
+              <ProtectedRoute>
+                <ManageExams />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/staff/tasks"
+            element={
+              <ProtectedRoute>
+                <ManageTasks />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/staff/exams/:id/questions"
+            element={
+              <ProtectedRoute>
+                <ManageQuestions />
               </ProtectedRoute>
             }
           />
@@ -67,6 +107,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Exam />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/exam/:id/take"
+            element={
+              <ProtectedRoute>
+                <ActiveExam />
               </ProtectedRoute>
             }
           />

@@ -6,6 +6,10 @@ import { FaFileAlt, FaEye, FaEdit, FaTrash } from 'react-icons/fa';
 
 const Dashboard = () => {
   const [resources, setResources] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [taskSubmissions, setTaskSubmissions] = useState({}); // taskId -> submission
+  const [taskFiles, setTaskFiles] = useState({}); // taskId -> file
+  const [uploadingTask, setUploadingTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -74,12 +78,10 @@ const Dashboard = () => {
         setSubjects(fetchedSubjects);
 
         // Set initial view state based on role
-        if (currentUser.role === 'staff') {
+        if (currentUser.role === 'staff' || currentUser.role === 'department_admin') {
           setViewState('all_resources');
         } else if (currentUser.role === 'admin') {
           navigate('/admin');
-        } else if (currentUser.role === 'department_admin') {
-          navigate('/dept-admin');
         }
 
 
@@ -93,6 +95,30 @@ const Dashboard = () => {
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
         setResources(sortedResources);
+
+        // 4. Fetch Tasks
+        if (currentUser.role === 'student') {
+            const taskRes = await axios.get(`${BASE_URL}/tasks`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setTasks(taskRes.data);
+
+            // Fetch submissions
+            const subs = {};
+            for (let task of taskRes.data) {
+                try {
+                    const subRes = await axios.get(`${BASE_URL}/tasks/${task._id}/my-submission`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (subRes.data.submission) {
+                        subs[task._id] = subRes.data.submission;
+                    }
+                } catch (e) {
+                    // No submission found, continue
+                }
+            }
+            setTaskSubmissions(subs);
+        }
 
         setLoading(false);
 
@@ -129,7 +155,31 @@ const Dashboard = () => {
       setViewState('subjects');
     } else if (option === 'exam') {
       navigate('/exam');
+    } else if (option === 'tasks') {
+      setViewState('tasks');
     }
+  };
+
+  const handleTaskSubmit = async (taskId) => {
+      const file = taskFiles[taskId];
+      if (!file) return alert('Please select a file to submit.');
+      
+      setUploadingTask(taskId);
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+          const token = localStorage.getItem('token');
+          const res = await axios.post(`${BASE_URL}/tasks/${taskId}/submit`, formData, {
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+          });
+          setTaskSubmissions(prev => ({...prev, [taskId]: res.data.submission}));
+          alert('Task submitted successfully!');
+      } catch (error) {
+          alert('Error submitting task: ' + (error.response?.data?.error || error.message));
+      } finally {
+          setUploadingTask(null);
+      }
   };
 
 
@@ -200,6 +250,18 @@ const Dashboard = () => {
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Exams</h2>
               <p className="text-gray-600">View exam schedules and details.</p>
             </div>
+
+            {/* Tasks Card */}
+            <div
+              onClick={() => handleLandingOption('tasks')}
+              className="bg-white p-10 rounded-xl shadow-lg border border-gray-200 cursor-pointer hover:shadow-2xl hover:border-orange-400 transition-all transform hover:-translate-y-2 w-full md:w-1/3 text-center group"
+            >
+              <div className="flex items-center justify-center w-20 h-20 bg-green-100 text-green-600 rounded-full mb-6 mx-auto group-hover:bg-green-500 group-hover:text-white transition-colors">
+                <span className="text-4xl">✅</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Tasks</h2>
+              <p className="text-gray-600">View and submit assignments.</p>
+            </div>
           </div>
         )}
 
@@ -248,7 +310,7 @@ const Dashboard = () => {
                         >
                           <FaEye className="mr-2" /> View
                         </a>
-                        {['admin', 'faculty'].includes(localStorage.getItem('role')) && (
+                        {['admin', 'staff', 'department_admin'].includes(localStorage.getItem('role')) && (
                           <button
                             onClick={() => navigate(`/edit-resource/${resource._id}`)}
                             className="flex items-center px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded hover:bg-blue-500 hover:text-white transition"
@@ -324,6 +386,70 @@ const Dashboard = () => {
           </div>
         )}
 
+        {viewState === 'tasks' && (
+          <div>
+            <button
+              onClick={handleBackToLanding}
+              className="mb-6 flex items-center text-gray-500 hover:text-gray-700 font-semibold"
+            >
+              &larr; Back to Dashboard
+            </button>
+
+            <h2 className="text-center text-2xl font-semibold text-orange-500 mb-8">
+              Your Assigned Tasks
+            </h2>
+
+            {tasks.length > 0 ? (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {tasks.map(task => {
+                      const submission = taskSubmissions[task._id];
+                      return (
+                      <div key={task._id} className="bg-white border rounded-xl p-6 shadow-sm flex flex-col justify-between">
+                          <div>
+                              <h3 className="font-bold text-xl text-gray-800 mb-2">{task.title}</h3>
+                              <p className="text-sm text-gray-600 mb-4">{task.description}</p>
+                              <div className="text-sm text-gray-500 space-y-1 mb-4">
+                                  <p><strong>Due Date:</strong> {new Date(task.dueDate).toLocaleString()}</p>
+                                  {task.fileUrl && (
+                                      <p><a href={task.fileUrl.startsWith('http') ? task.fileUrl : `${BASE_URL.replace('/api', '')}${task.fileUrl}`} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">View Attached Document</a></p>
+                                  )}
+                              </div>
+                              <hr className="my-4"/>
+                          </div>
+                          <div>
+                              {submission ? (
+                                  <div className="bg-green-50 text-green-700 p-4 rounded-lg text-sm">
+                                      <p className="font-bold mb-1">✅ Submitted on {new Date(submission.submittedAt).toLocaleString()}</p>
+                                      <a href={submission.fileUrl.startsWith('http') ? submission.fileUrl : `${BASE_URL.replace('/api', '')}${submission.fileUrl}`} target="_blank" rel="noreferrer" className="underline hover:text-green-800">Review your submission</a>
+                                  </div>
+                              ) : (
+                                  <div className="space-y-3">
+                                      <input 
+                                          type="file" 
+                                          onChange={e => setTaskFiles(prev => ({...prev, [task._id]: e.target.files[0]}))}
+                                          className="w-full text-sm border p-2 rounded"
+                                      />
+                                      <button 
+                                          onClick={() => handleTaskSubmit(task._id)}
+                                          disabled={uploadingTask === task._id}
+                                          className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
+                                      >
+                                          {uploadingTask === task._id ? 'Submitting...' : 'Submit Task'}
+                                      </button>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  )})}
+              </div>
+            ) : (
+                <div className="text-center text-lg text-gray-500 mt-10">
+                    <p>No tasks assigned yet.</p>
+                </div>
+            )}
+          </div>
+        )}
+
         {viewState === 'all_resources' && (
           /* All Resources View for Non-Students */
           <div>
@@ -363,7 +489,7 @@ const Dashboard = () => {
                       >
                         <FaEye className="mr-2" /> View
                       </a>
-                      {['admin', 'faculty', 'department_admin'].includes(localStorage.getItem('role')) && (
+                      {['admin', 'staff', 'department_admin'].includes(localStorage.getItem('role')) && (
                         <button
                           onClick={() => navigate(`/edit-resource/${resource._id}`)}
                           className="flex items-center px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded hover:bg-blue-500 hover:text-white transition"

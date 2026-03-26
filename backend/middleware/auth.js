@@ -38,10 +38,21 @@ const authMiddleware = {
     });
   },
 
+  // Check if staff or department admin
+  isStaffOrDepartmentAdmin: (req, res, next) => {
+    authMiddleware.verifyToken(req, res, () => {
+      if (['staff', 'department_admin'].includes(req.user.role)) {
+        next();
+      } else {
+        res.status(403).json({ message: 'Staff or Department Admin access required' });
+      }
+    });
+  },
+
   // Check if staff
   isStaff: (req, res, next) => {
     authMiddleware.verifyToken(req, res, () => {
-      if (req.user.role === 'staff') {
+      if (['staff', 'department_admin'].includes(req.user.role)) {
         next();
       } else {
         res.status(403).json({ message: 'Staff access required' });
@@ -52,10 +63,10 @@ const authMiddleware = {
   // Check if staff or admin
   isStaffOrAdmin: (req, res, next) => {
     authMiddleware.verifyToken(req, res, () => {
-      if (['staff', 'admin'].includes(req.user.role)) {
+      if (['staff', 'admin', 'department_admin'].includes(req.user.role)) {
         next();
       } else {
-        res.status(403).json({ message: 'Staff or admin access required' });
+        res.status(403).json({ message: 'Staff, Admin, or Department Admin access required' });
       }
     });
   },

@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
 // Get current user info
 router.get('/me', authMiddleware.isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId, 'username role staffName staffId subjects department year section rollNo regNo');
+    const user = await User.findById(req.user.userId, 'username role staffName staffId subjects advisingSections department year section rollNo regNo');
     res.json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -92,7 +92,7 @@ router.delete('/dept-admin/:id', authMiddleware.isAdmin, async (req, res) => {
 // Department Admin: Create Staff account
 router.post('/create-staff', authMiddleware.isDepartmentAdmin, async (req, res) => {
   try {
-    const { staffName, username, password, subjects } = req.body;
+    const { staffName, username, password, subjects, advisingSections } = req.body;
     console.log('CREATE STAFF REQUEST:', req.body);
     console.log('Creator:', req.user.userId);
 
@@ -129,6 +129,7 @@ router.post('/create-staff', authMiddleware.isDepartmentAdmin, async (req, res) 
       role: 'staff',
       staffDepartment: department,
       subjects: subjects || [],
+      advisingSections: advisingSections || [],
       createdBy: req.user.userId
     });
     await staff.save();
@@ -186,6 +187,10 @@ router.put('/staff/:id', authMiddleware.isAdminOrDepartmentAdmin, async (req, re
       staff.subjects = body.subjects;
       staff.markModified('subjects');
     }
+    if (body.advisingSections !== undefined) {
+      staff.advisingSections = body.advisingSections;
+      staff.markModified('advisingSections');
+    }
 
     // Save with validation skipped for password
     await staff.save({ validateModifiedOnly: true });
@@ -200,7 +205,8 @@ router.put('/staff/:id', authMiddleware.isAdminOrDepartmentAdmin, async (req, re
         staffName: staff.staffName,
         staffId: staff.staffId,
         staffDepartment: staff.staffDepartment,
-        subjects: staff.subjects
+        subjects: staff.subjects,
+        advisingSections: staff.advisingSections
       }
     });
   } catch (error) {
@@ -266,7 +272,7 @@ router.get('/staff', authMiddleware.isAdminOrDepartmentAdmin, async (req, res) =
 
     console.log('FINAL STAFF QUERY:', JSON.stringify(query, null, 2));
 
-    const staff = await User.find(query, 'username staffName staffId staffDepartment subjects role createdAt');
+    const staff = await User.find(query, 'username staffName staffId staffDepartment subjects advisingSections role createdAt');
     console.log('FOUND STAFF COUNT:', staff.length);
     res.json(staff);
   } catch (error) {

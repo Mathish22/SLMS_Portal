@@ -12,19 +12,22 @@ const seedAdmin = async () => {
         const existingAdmin = await User.findOne({ username: 'Mathish@22' });
 
         if (existingAdmin) {
-            console.log('Admin account already exists');
+            console.log('Admin account already exists. Updating password...');
+            existingAdmin.password = 'Aswath@123';
+            await existingAdmin.save();
+            console.log('Admin password successfully updated to Aswath@123');
         } else {
             // Create admin account
             const admin = new User({
                 username: 'Mathish@22',
-                password: 'Aswath@21',
+                password: 'Aswath@123',
                 role: 'admin',
                 createdBy: null
             });
             await admin.save();
             console.log('Admin account created successfully!');
             console.log('Username: Mathish@22');
-            console.log('Password: Aswath@21');
+            console.log('Password: Aswath@123');
         }
 
         // Optionally clear old test users (keep only admin)

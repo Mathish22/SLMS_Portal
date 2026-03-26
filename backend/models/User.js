@@ -20,6 +20,10 @@ const userSchema = new mongoose.Schema({
     department: { type: String },
     section: { type: String }
   }],
+  advisingSections: [{
+    year: { type: String },
+    section: { type: String }
+  }],
   // Student-specific fields
   regulation: { type: String, default: '' },
   studentName: { type: String, default: '' },

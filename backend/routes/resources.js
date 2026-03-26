@@ -27,7 +27,7 @@ router.get('/', authMiddleware.isAuthenticated, async (req, res) => {
       query.regulation = user.regulation;
     }
 
-    const resources = await Resource.find(query);
+    const resources = await Resource.find(query).populate('uploadedBy', 'staffName username');
     res.json(resources);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -172,8 +172,7 @@ router.delete('/:id', authMiddleware.isAuthenticated, authMiddleware.isStaffOrAd
     if (req.user.role === 'staff' && resource.uploadedBy.toString() !== req.user.userId) {
       return res.status(403).json({ error: 'You can only delete resources you uploaded' });
     }
-
-    // Check for "Department Admin" role ownership (if enforced, currently they can delete any?)
+    // Department admins and admins bypass this check
     // Let's assume Dept Admin can delete any resource (or at least filtering by dept is good but resources don't have dept field explicit, just subjectCode)
     // For now, allow Dept Admin to delete any resource as per current implied logic (or consistent with plan).
     // The plan said: "Department Admins and Admins can delete any resource".
