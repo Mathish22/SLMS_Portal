@@ -9,7 +9,7 @@ const examSchema = new mongoose.Schema({
     startTime: { type: Date, required: true }, // When students can start
     endTime: { type: Date, required: true },   // When the exam closes
     sebRequired: { type: Boolean, default: true },
-    examType: { type: String, enum: ['MCQ', 'Notepad'], default: 'MCQ' },
+    examType: { type: String, enum: ['MCQ', 'Notepad', 'Mixed'], default: 'MCQ' },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

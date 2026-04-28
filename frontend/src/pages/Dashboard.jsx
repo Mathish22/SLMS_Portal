@@ -12,6 +12,8 @@ const Dashboard = () => {
   const [uploadingTask, setUploadingTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [newResourcesCount, setNewResourcesCount] = useState(0);
+  const [newExamsCount, setNewExamsCount] = useState(0);
 
 
   const navigate = useNavigate();
@@ -96,6 +98,20 @@ const Dashboard = () => {
         );
         setResources(sortedResources);
 
+        if (currentUser.role === 'student') {
+          const lastSeenRes = new Date(currentUser.lastSeenResources || 0).getTime();
+          const newResCount = sortedResources.filter(r => new Date(r.createdAt).getTime() > lastSeenRes).length;
+          setNewResourcesCount(newResCount);
+
+          // Fetch Exams to get the count
+          const examRes = await axios.get(`${BASE_URL}/exams`, {
+              headers: { Authorization: `Bearer ${token}` }
+          });
+          const lastSeenEx = new Date(currentUser.lastSeenExams || 0).getTime();
+          const newExCount = examRes.data.filter(e => new Date(e.createdAt).getTime() > lastSeenEx).length;
+          setNewExamsCount(newExCount);
+        }
+
         // 4. Fetch Tasks
         if (currentUser.role === 'student') {
             const taskRes = await axios.get(`${BASE_URL}/tasks`, {
@@ -130,6 +146,40 @@ const Dashboard = () => {
     };
 
     fetchData();
+
+    // Silent polling for notifications
+    const pollNotifications = async () => {
+      try {
+        if (!token) return;
+        const userRes = await axios.get(`${BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+        const currentUser = userRes.data;
+        if (currentUser.role === 'student') {
+          const resourceRes = await axios.get(`${BASE_URL}/resources`, { headers: { Authorization: `Bearer ${token}` } });
+          const subjectRes = await axios.get(`${BASE_URL}/subjects`, {
+            params: { department: currentUser.department, year: currentUser.year },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          let fS = [];
+          if (subjectRes.data && Array.isArray(subjectRes.data)) {
+            subjectRes.data.forEach(d => {
+              if (d.subjects && Array.isArray(d.subjects)) { fS = [...fS, ...d.subjects]; }
+            });
+          }
+          const lastSeenResTime = new Date(currentUser.lastSeenResources || 0).getTime();
+          const newRCount = resourceRes.data.filter(r => new Date(r.createdAt).getTime() > lastSeenResTime).length;
+          setNewResourcesCount(newRCount);
+
+          const examRes = await axios.get(`${BASE_URL}/exams`, { headers: { Authorization: `Bearer ${token}` } });
+          const lastSeenExTime = new Date(currentUser.lastSeenExams || 0).getTime();
+          const newECount = examRes.data.filter(e => new Date(e.createdAt).getTime() > lastSeenExTime).length;
+          setNewExamsCount(newECount);
+        }
+      } catch (err) {
+        // ignore polling errors
+      }
+    };
+    const intervalId = setInterval(pollNotifications, 5000); // 5 seconds polling
+    return () => clearInterval(intervalId);
   }, [navigate]);
 
   // Handle clicking a subject card
@@ -150,10 +200,31 @@ const Dashboard = () => {
     setSelectedSubject(null);
   }
 
-  const handleLandingOption = (option) => {
+  const handleLandingOption = async (option) => {
+    const token = localStorage.getItem('token');
     if (option === 'resources') {
+      if (user?.role === 'student' && newResourcesCount > 0) {
+        try {
+          await axios.post(`${BASE_URL}/auth/seen-updates`, { type: 'resources' }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setNewResourcesCount(0);
+        } catch (e) {
+          console.error("Failed to update seen status");
+        }
+      }
       setViewState('subjects');
     } else if (option === 'exam') {
+      if (user?.role === 'student' && newExamsCount > 0) {
+        try {
+          await axios.post(`${BASE_URL}/auth/seen-updates`, { type: 'exams' }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setNewExamsCount(0);
+        } catch (e) {
+          console.error("Failed to update seen status");
+        }
+      }
       navigate('/exam');
     } else if (option === 'tasks') {
       setViewState('tasks');
@@ -230,8 +301,13 @@ const Dashboard = () => {
             {/* Resources Card */}
             <div
               onClick={() => handleLandingOption('resources')}
-              className="bg-white p-10 rounded-xl shadow-lg border border-gray-200 cursor-pointer hover:shadow-2xl hover:border-orange-400 transition-all transform hover:-translate-y-2 w-full md:w-1/3 text-center group"
+              className="relative bg-white p-10 rounded-xl shadow-lg border border-gray-200 cursor-pointer hover:shadow-2xl hover:border-orange-400 transition-all transform hover:-translate-y-2 w-full md:w-1/3 text-center group"
             >
+              {newResourcesCount > 0 && (
+                <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold px-2 py-1 object-right-top rounded-full shadow-md animate-pulse">
+                  {newResourcesCount} New
+                </div>
+              )}
               <div className="flex items-center justify-center w-20 h-20 bg-orange-100 text-orange-600 rounded-full mb-6 mx-auto group-hover:bg-orange-500 group-hover:text-white transition-colors">
                 <FaFileAlt size={40} />
               </div>
@@ -242,8 +318,13 @@ const Dashboard = () => {
             {/* Exam Card */}
             <div
               onClick={() => handleLandingOption('exam')}
-              className="bg-white p-10 rounded-xl shadow-lg border border-gray-200 cursor-pointer hover:shadow-2xl hover:border-orange-400 transition-all transform hover:-translate-y-2 w-full md:w-1/3 text-center group"
+              className="relative bg-white p-10 rounded-xl shadow-lg border border-gray-200 cursor-pointer hover:shadow-2xl hover:border-orange-400 transition-all transform hover:-translate-y-2 w-full md:w-1/3 text-center group"
             >
+              {newExamsCount > 0 && (
+                <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold px-2 py-1 object-right-top rounded-full shadow-md animate-pulse">
+                  {newExamsCount} New
+                </div>
+              )}
               <div className="flex items-center justify-center w-20 h-20 bg-blue-100 text-blue-600 rounded-full mb-6 mx-auto group-hover:bg-blue-500 group-hover:text-white transition-colors">
                 <FaEdit size={40} />
               </div>

@@ -32,6 +32,8 @@ const userSchema = new mongoose.Schema({
   department: { type: String, default: '' },
   year: { type: String, default: '' },
   section: { type: String, default: '' },
+  lastSeenResources: { type: Date, default: Date.now },
+  lastSeenExams: { type: Date, default: Date.now },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

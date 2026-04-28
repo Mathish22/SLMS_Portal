@@ -63,10 +63,7 @@ router.post('/:id/questions', verifyToken, isStaffOrAdmin, async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized to add questions to this exam' });
         }
 
-        // Check if the exam has started or has attempts
-        if (new Date() >= new Date(exam.startTime)) {
-            return res.status(400).json({ error: 'Cannot add questions: The exam start time has already passed.' });
-        }
+        // Check if the exam has attempts
         const existingAttempt = await ExamAttempt.findOne({ examId });
         if (existingAttempt) {
             return res.status(400).json({ error: 'Cannot add questions: Students have already attended this exam.' });
@@ -92,12 +89,6 @@ router.delete('/questions/:questionId', verifyToken, isStaffOrAdmin, async (req,
     try {
         const question = await Question.findById(req.params.questionId);
         if (!question) return res.status(404).json({ error: 'Question not found' });
-
-        // Check if the exam has started
-        const exam = await Exam.findById(question.examId);
-        if (exam && new Date() >= new Date(exam.startTime)) {
-            return res.status(400).json({ error: 'Cannot delete questions: The exam start time has already passed.' });
-        }
 
         // Check if any student has already attempted this exam
         const existingAttempt = await ExamAttempt.findOne({ examId: question.examId });
@@ -160,7 +151,7 @@ router.get('/attempts', verifyToken, isStaffOrAdmin, async (req, res) => {
         }
 
         // Find all exams that belong to this staff/dept admin
-        const exams = await Exam.find(examsQuery).select('_id title examType');
+        const exams = await Exam.find(examsQuery).select('_id title examType department year');
         const examIds = exams.map(e => e._id);
 
         if (examIds.length === 0) {
@@ -177,7 +168,52 @@ router.get('/attempts', verifyToken, isStaffOrAdmin, async (req, res) => {
             })
             .sort({ submittedAt: -1 });
 
-        res.json(attempts);
+        const User = require('../models/User');
+        const allResults = [];
+
+        for (const exam of exams) {
+            const students = await User.find({ 
+                role: 'student', 
+                department: exam.department, 
+                year: String(exam.year)
+            }).select('studentName rollNo username department year');
+
+            const examAttempts = attempts.filter(a => a.examId && a.examId._id.toString() === exam._id.toString());
+
+            for (const student of students) {
+                const attempt = examAttempts.find(a => a.studentId && a.studentId._id.toString() === student._id.toString());
+                
+                if (attempt) {
+                    allResults.push({
+                        ...attempt.toObject(),
+                        status: 'Completed'
+                    });
+                } else {
+                    allResults.push({
+                        _id: `pending_${exam._id}_${student._id}`,
+                        studentId: student.toObject(),
+                        examId: exam.toObject(),
+                        status: 'Pending',
+                        score: 0,
+                        maxScore: 0,
+                        submittedAt: null,
+                        answers: []
+                    });
+                }
+            }
+        }
+
+        // Sort: completed first, then by submittedAt desc
+        allResults.sort((a, b) => {
+            if (a.status === 'Completed' && b.status === 'Pending') return -1;
+            if (a.status === 'Pending' && b.status === 'Completed') return 1;
+            if (a.status === 'Completed' && b.status === 'Completed') {
+                return new Date(b.submittedAt) - new Date(a.submittedAt);
+            }
+            return 0;
+        });
+
+        res.json(allResults);
     } catch (error) {
         console.error('Error fetching attempts:', error);
         res.status(500).json({ error: 'Failed to fetch student attempts' });
@@ -194,7 +230,7 @@ router.get('/:id', verifyToken, async (req, res) => {
         const hasStarted = new Date() >= new Date(exam.startTime);
         
         exam.hasAttempts = hasAttempts;
-        exam.isLocked = hasAttempts || hasStarted;
+        exam.isLocked = hasAttempts; // Only lock if students have started attempts
 
         res.json(exam);
     } catch (error) {

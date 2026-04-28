@@ -10,6 +10,7 @@ const StaffDashboard = () => {
     const [studentAttempts, setStudentAttempts] = useState([]);
     const [selectedAttempt, setSelectedAttempt] = useState(null);
     const [showAttemptModal, setShowAttemptModal] = useState(false);
+    const [sortConfig, setSortConfig] = useState({ key: 'status', direction: 'asc' });
     
     const [newStudent, setNewStudent] = useState({
         username: '',
@@ -267,6 +268,54 @@ const StaffDashboard = () => {
     );
 
     // Render Student Answers Tab
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        setSortConfig({ key, direction });
+    };
+
+    const getSortedAttempts = () => {
+        let sorted = [...studentAttempts];
+        if (sortConfig.key) {
+            sorted.sort((a, b) => {
+                let aVal, bVal;
+                switch(sortConfig.key) {
+                    case 'rollNo':
+                        aVal = a.studentId?.rollNo || '';
+                        bVal = b.studentId?.rollNo || '';
+                        break;
+                    case 'studentName':
+                        aVal = a.studentId?.studentName || '';
+                        bVal = b.studentId?.studentName || '';
+                        break;
+                    case 'examTitle':
+                        aVal = a.examId?.title || '';
+                        bVal = b.examId?.title || '';
+                        break;
+                    case 'score':
+                        aVal = a.score || 0;
+                        bVal = b.score || 0;
+                        break;
+                    case 'status':
+                        aVal = a.status || '';
+                        bVal = b.status || '';
+                        break;
+                    case 'submittedAt':
+                        aVal = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+                        bVal = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+                        break;
+                    default:
+                        aVal = '';
+                        bVal = '';
+                }
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return sorted;
+    };
+
     const renderStudentAnswers = () => (
         <div className="bg-white rounded-2xl shadow-lg p-8">
             <div className="flex justify-between items-center mb-8">
@@ -297,35 +346,51 @@ const StaffDashboard = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-200">
-                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider cursor-pointer font-mono">Roll No</th>
-                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider">Student Name</th>
-                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider">Exam Title</th>
-                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider">Score</th>
-                                <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider">Submitted</th>
+                                <th onClick={() => handleSort('rollNo')} className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider cursor-pointer hover:bg-gray-100 font-mono">Roll No {sortConfig.key === 'rollNo' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                <th onClick={() => handleSort('studentName')} className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider cursor-pointer hover:bg-gray-100">Student Name {sortConfig.key === 'studentName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                <th onClick={() => handleSort('examTitle')} className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider cursor-pointer hover:bg-gray-100">Exam Title {sortConfig.key === 'examTitle' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                <th onClick={() => handleSort('status')} className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider cursor-pointer hover:bg-gray-100">Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                <th onClick={() => handleSort('score')} className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider cursor-pointer hover:bg-gray-100">Score {sortConfig.key === 'score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                <th onClick={() => handleSort('submittedAt')} className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider cursor-pointer hover:bg-gray-100">Submitted {sortConfig.key === 'submittedAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                 <th className="p-4 font-semibold text-gray-600 uppercase text-xs tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {studentAttempts.map((attempt) => (
+                            {getSortedAttempts().map((attempt) => (
                                 <tr key={attempt._id} className="hover:bg-blue-50 transition-colors">
                                     <td className="p-4 font-mono text-gray-800 font-medium">{attempt.studentId?.rollNo || attempt.studentId?.username || '-'}</td>
                                     <td className="p-4 text-gray-800 font-medium">{attempt.studentId?.studentName || 'Unknown Student'}</td>
                                     <td className="p-4 text-gray-600">{attempt.examId?.title || 'Deleted Exam'}</td>
                                     <td className="p-4">
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                            (attempt.score / attempt.maxScore) >= 0.5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                            attempt.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                                         }`}>
-                                            {attempt.score} / {attempt.maxScore}
+                                            {attempt.status === 'Completed' ? 'Completed' : 'Pending'}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-sm text-gray-500">{new Date(attempt.submittedAt).toLocaleString()}</td>
+                                    <td className="p-4">
+                                        {attempt.status === 'Completed' ? (
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                (attempt.score / attempt.maxScore) >= 0.5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                            }`}>
+                                                {attempt.score} / {attempt.maxScore}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-400">-</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4 text-sm text-gray-500">{attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString() : '-'}</td>
                                     <td className="p-4 text-right">
-                                        <button 
-                                            onClick={() => { setSelectedAttempt(attempt); setShowAttemptModal(true); }}
-                                            className="text-white bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                                        >
-                                            View Answers
-                                        </button>
+                                        {attempt.status === 'Completed' ? (
+                                            <button 
+                                                onClick={() => { setSelectedAttempt(attempt); setShowAttemptModal(true); }}
+                                                className="text-white bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                            >
+                                                View Answers
+                                            </button>
+                                        ) : (
+                                            <span className="text-gray-400 text-sm italic px-4 py-2">No answers</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

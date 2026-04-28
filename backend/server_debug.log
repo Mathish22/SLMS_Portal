@@ -7,3 +7,15 @@
 2026-02-12T07:25:23.492Z: Body: {"title":"Basics of the BCT","year":"IV","subjectCode":"19ITX12"}
 2026-02-12T07:25:23.493Z: File: BCT_sample-1770881123446.pdf
 2026-02-12T07:25:23.497Z: Resource saved successfully. ID: 698d8063972c8f66965d199a
+2026-03-26T09:07:53.999Z: --- Upload Request ---
+2026-03-26T09:07:54.002Z: Body: {"title":"Seminar","year":"IV","subjectCode":"19IT712"}
+2026-03-26T09:07:54.003Z: File: CF-seminar-1774516073956.mp4
+2026-03-26T09:07:54.081Z: Resource saved successfully. ID: 69c4f76a29cd91c34b7980d2
+2026-03-26T09:49:21.952Z: --- Upload Request ---
+2026-03-26T09:49:21.960Z: Body: {"title":"SPQM","year":"IV","subjectCode":"19ITX12"}
+2026-03-26T09:49:21.962Z: File: SPQM-1-1774518559321.mp4
+2026-03-26T09:49:22.056Z: Resource saved successfully. ID: 69c50121a21a30b799be7750
+2026-03-26T10:16:03.316Z: --- Upload Request ---
+2026-03-26T10:16:03.320Z: Body: {"title":"SEMINAR VIDEO","year":"IV","subjectCode":"19IT712"}
+2026-03-26T10:16:03.321Z: File: CF-2-1774520162220.mp4
+2026-03-26T10:16:03.372Z: Resource saved successfully. ID: 69c50763495022e12a88f097

@@ -27,7 +27,29 @@ router.post('/login', async (req, res) => {
 // Get current user info
 router.get('/me', authMiddleware.isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId, 'username role staffName staffId subjects advisingSections department year section rollNo regNo');
+    const user = await User.findById(req.user.userId, 'username role staffName staffId subjects advisingSections department year section rollNo regNo lastSeenResources lastSeenExams');
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update last seen for resources or exams
+router.post('/seen-updates', authMiddleware.isAuthenticated, async (req, res) => {
+  try {
+    const { type } = req.body;
+    const updateField = type === 'resources' ? 'lastSeenResources' : (type === 'exams' ? 'lastSeenExams' : null);
+    
+    if (!updateField) {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      { $set: { [updateField]: Date.now() } },
+      { new: true, select: 'username role staffName staffId subjects advisingSections department year section rollNo regNo lastSeenResources lastSeenExams' }
+    );
+    
     res.json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });

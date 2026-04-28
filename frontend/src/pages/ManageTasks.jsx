@@ -13,9 +13,11 @@ const ManageTasks = () => {
     const [newTask, setNewTask] = useState({
         title: '',
         description: '',
-        year: '',
+        subjectIndex: '',
         dueDate: ''
     });
+    const [subjects, setSubjects] = useState([]);
+    const [sortOrder, setSortOrder] = useState('default');
 
     const token = localStorage.getItem('token');
     const navigate = useNavigate();
@@ -25,7 +27,21 @@ const ManageTasks = () => {
 
     useEffect(() => {
         fetchTasks();
+        fetchSubjects();
     }, []);
+
+    const fetchSubjects = async () => {
+        try {
+            const res = await axios.get(`${BASE_URL}/auth/me`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data && res.data.subjects) {
+                setSubjects(res.data.subjects);
+            }
+        } catch (error) {
+            console.error('Error fetching subjects', error);
+        }
+    };
 
     const fetchTasks = async () => {
         try {
@@ -43,11 +59,22 @@ const ManageTasks = () => {
         setIsLoading(true);
         setMessage('');
 
+        if (newTask.subjectIndex === '') {
+            setMessage({ type: 'error', text: 'Please select a subject' });
+            setIsLoading(false);
+            return;
+        }
+
+        const selectedSubject = subjects[newTask.subjectIndex];
+
         try {
             await axios.post(`${BASE_URL}/tasks`, {
                 title: newTask.title,
                 description: newTask.description,
-                year: newTask.year,
+                year: selectedSubject.year,
+                department: selectedSubject.department,
+                subjectCode: selectedSubject.subjectCode,
+                subjectName: selectedSubject.subjectName,
                 dueDate: newTask.dueDate
             }, {
                 headers: { 
@@ -55,7 +82,7 @@ const ManageTasks = () => {
                 }
             });
             setMessage({ type: 'success', text: 'Task created successfully!' });
-            setNewTask({ title: '', description: '', year: '', dueDate: '' });
+            setNewTask({ title: '', description: '', subjectIndex: '', dueDate: '' });
             setShowForm(false);
             fetchTasks();
         } catch (error) {
@@ -121,10 +148,12 @@ const ManageTasks = () => {
                                     <input type="datetime-local" required value={newTask.dueDate} onChange={e => setNewTask({...newTask, dueDate: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                                    <select required value={newTask.year} onChange={e => setNewTask({...newTask, year: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                                        <option value="">Select Year</option>
-                                        {years.map(y => <option key={y}>{y}</option>)}
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                                    <select required value={newTask.subjectIndex} onChange={e => setNewTask({...newTask, subjectIndex: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="">Select Subject</option>
+                                        {subjects.map((s, idx) => (
+                                            <option key={idx} value={idx}>{s.subjectName} ({s.subjectCode}) - {s.year} Year</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="md:col-span-2">
@@ -154,7 +183,7 @@ const ManageTasks = () => {
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <h3 className="font-bold text-lg text-gray-800">{task.title}</h3>
-                                                <p className="text-sm text-gray-600 mt-1">Target: {task.year} Year, {task.department}</p>
+                                                <p className="text-sm text-gray-600 mt-1">Target: {task.subjectName ? `${task.subjectName} (${task.subjectCode})` : `${task.year} Year, ${task.department}`}</p>
                                                 <p className="text-sm text-gray-600">Due: {new Date(task.dueDate).toLocaleString()}</p>
                                             </div>
                                             {task.fileUrl && (
@@ -169,26 +198,59 @@ const ManageTasks = () => {
 
                     {/* Submissions List */}
                     <div className="bg-white rounded-xl shadow-md p-6">
-                        <h2 className="text-xl font-semibold mb-4">Submissions</h2>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold">Submissions</h2>
+                            {selectedTask && submissions.length > 0 && (
+                                <select 
+                                    value={sortOrder} 
+                                    onChange={(e) => setSortOrder(e.target.value)}
+                                    className="border rounded px-2 py-1 text-sm bg-gray-50"
+                                >
+                                    <option value="default">Default Sort (Completed First)</option>
+                                    <option value="nameAsc">Name (A-Z)</option>
+                                    <option value="nameDesc">Name (Z-A)</option>
+                                </select>
+                            )}
+                        </div>
                         {!selectedTask ? (
                             <p className="text-gray-500 text-center py-8">Select a task to view submissions.</p>
                         ) : (
                             <div>
                                 {submissions.length === 0 ? (
-                                    <p className="text-gray-500 text-center py-8">No submissions yet.</p>
+                                    <p className="text-gray-500 text-center py-8">No students found for this task's target group.</p>
                                 ) : (
                                     <div className="space-y-4">
-                                        {submissions.map(sub => (
-                                            <div key={sub._id} className="border rounded-lg p-4 bg-gray-50">
+                                        {[...submissions].sort((a, b) => {
+                                            if (sortOrder === 'default') return 0; // Backend handles default sort
+                                            const nameA = (a.student.studentName || a.student.username || '').toLowerCase();
+                                            const nameB = (b.student.studentName || b.student.username || '').toLowerCase();
+                                            if (sortOrder === 'nameAsc') return nameA.localeCompare(nameB);
+                                            if (sortOrder === 'nameDesc') return nameB.localeCompare(nameA);
+                                            return 0;
+                                        }).map(sub => (
+                                            <div key={sub._id} className={`border rounded-lg p-4 transition-colors ${sub.status === 'Completed' ? 'bg-green-50 border-green-200' : 'bg-gray-50'}`}>
                                                 <div className="flex justify-between items-start">
                                                     <div>
-                                                        <h4 className="font-bold text-gray-800">{sub.student.studentName || sub.student.username}</h4>
-                                                        <p className="text-sm text-gray-600">{sub.student.rollNo} - {sub.student.department}</p>
-                                                        <p className="text-xs text-gray-500 mt-1">Submitted at: {new Date(sub.submittedAt).toLocaleString()}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="font-bold text-gray-800">{sub.student.studentName || sub.student.username}</h4>
+                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                                                sub.status === 'Completed' ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'
+                                                            }`}>
+                                                                {sub.status === 'Completed' ? 'Completed' : 'Pending'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 font-mono mt-1">{sub.student.rollNo || '-'} <span className="font-sans text-gray-400">|</span> {sub.student.department}</p>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            {sub.status === 'Completed' ? `Submitted at: ${new Date(sub.submittedAt).toLocaleString()}` : 'Not submitted yet'}
+                                                        </p>
                                                     </div>
-                                                    <a href={sub.fileUrl.startsWith('http') ? sub.fileUrl : `${BASE_URL.replace('/api', '')}${sub.fileUrl}`} target="_blank" rel="noreferrer" className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200">
-                                                        View Document
-                                                    </a>
+                                                    {sub.status === 'Completed' && sub.fileUrl ? (
+                                                        <a href={sub.fileUrl.startsWith('http') ? sub.fileUrl : `${BASE_URL.replace('/api', '')}${sub.fileUrl}`} target="_blank" rel="noreferrer" className="bg-blue-500 text-white shadow-sm px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+                                                            View Document
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-sm italic px-4 py-2">No Document</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}

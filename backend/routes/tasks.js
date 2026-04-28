@@ -39,10 +39,11 @@ router.post(
   authMiddleware.isStaff,
   async (req, res) => {
     try {
-      const { title, description, year, dueDate } = req.body;
+      const { title, description, year, department: customDept, subjectCode, subjectName, dueDate } = req.body;
 
       const staffUser = await User.findById(req.user.userId);
-      const department = staffUser.department || staffUser.staffDepartment || 'Unknown';
+      // Use customDept from subject if provided, else fallback to staff's default department
+      const department = customDept || staffUser.department || staffUser.staffDepartment || 'Unknown';
 
       if (!title || !year || !dueDate) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -53,6 +54,8 @@ router.post(
         description,
         department,
         year,
+        subjectCode,
+        subjectName,
         dueDate,
         createdBy: req.user.userId
       });
@@ -78,11 +81,50 @@ router.get('/:id/submissions', authMiddleware.isAuthenticated, authMiddleware.is
       return res.status(403).json({ error: 'Not authorized to view these submissions' });
     }
 
-    const submissions = await TaskSubmission.find({ task: req.params.id })
-      .populate('student', 'username studentName regNo rollNo department section year')
-      .sort({ submittedAt: -1 });
+    const TaskSubmission = require('../models/TaskSubmission');
+    const User = require('../models/User');
 
-    res.json(submissions);
+    const submissions = await TaskSubmission.find({ task: req.params.id })
+      .populate('student', 'username studentName regNo rollNo department section year');
+
+    const students = await User.find({
+        role: 'student',
+        department: task.department,
+        year: String(task.year)
+    }).select('username studentName regNo rollNo department section year');
+
+    const allResults = [];
+
+    for (const student of students) {
+        const submission = submissions.find(s => s.student && s.student._id.toString() === student._id.toString());
+        if (submission) {
+            allResults.push({
+                ...submission.toObject(),
+                status: 'Completed'
+            });
+        } else {
+            allResults.push({
+                _id: `pending_${task._id}_${student._id}`,
+                task: task.toObject(),
+                student: student.toObject(),
+                status: 'Pending',
+                submittedAt: null,
+                fileUrl: null
+            });
+        }
+    }
+
+    // Sort: completed first, then by submittedAt desc
+    allResults.sort((a, b) => {
+        if (a.status === 'Completed' && b.status === 'Pending') return -1;
+        if (a.status === 'Pending' && b.status === 'Completed') return 1;
+        if (a.status === 'Completed' && b.status === 'Completed') {
+            return new Date(b.submittedAt) - new Date(a.submittedAt);
+        }
+        return 0;
+    });
+
+    res.json(allResults);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

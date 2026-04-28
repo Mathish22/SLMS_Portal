@@ -5,6 +5,8 @@ const taskSchema = new mongoose.Schema({
   description: { type: String },
   department: { type: String, required: true },
   year: { type: String, required: true },
+  subjectCode: { type: String },
+  subjectName: { type: String },
   dueDate: { type: Date, required: true },
   fileUrl: { type: String }, // Optional attachment by staff
   cloudinaryId: { type: String },

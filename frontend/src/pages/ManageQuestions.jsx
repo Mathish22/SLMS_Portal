@@ -15,7 +15,7 @@ const ManageQuestions = () => {
         questionText: '',
         questionType: 'MCQ',
         options: ['', '', '', ''],
-        correctAnswer: ''
+        correctAnswerIndex: ''
     });
 
     const navigate = useNavigate();
@@ -56,21 +56,16 @@ const ManageQuestions = () => {
 
     const handleOptionChange = (index, value) => {
         const updatedOptions = [...newQuestion.options];
-        const oldVal = updatedOptions[index];
         updatedOptions[index] = value;
-        
-        let newCorrectAnswer = newQuestion.correctAnswer;
-        if (newCorrectAnswer === oldVal && oldVal !== '') {
-            newCorrectAnswer = value;
-        }
-
-        setNewQuestion({ ...newQuestion, options: updatedOptions, correctAnswer: newCorrectAnswer });
+        setNewQuestion({ ...newQuestion, options: updatedOptions });
     };
 
     const handleCreateQuestion = async (e) => {
         e.preventDefault();
         setIsLoading(true);
         setMessage('');
+
+        let submissionData = { ...newQuestion };
 
         // Basic validation
         if (newQuestion.questionType === 'MCQ') {
@@ -80,15 +75,16 @@ const ManageQuestions = () => {
                 return;
             }
 
-            if (!newQuestion.correctAnswer) {
+            if (newQuestion.correctAnswerIndex === '') {
                 setMessage('Please select the correct answer for MCQ.');
                 setIsLoading(false);
                 return;
             }
+            submissionData.correctAnswer = newQuestion.options[parseInt(newQuestion.correctAnswerIndex)];
         }
 
         try {
-            await axios.post(`${BASE_URL}/exams/${id}/questions`, newQuestion, {
+            await axios.post(`${BASE_URL}/exams/${id}/questions`, submissionData, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setMessage('Question added successfully!');
@@ -96,7 +92,7 @@ const ManageQuestions = () => {
                 questionText: '',
                 questionType: 'MCQ',
                 options: ['', '', '', ''],
-                correctAnswer: ''
+                correctAnswerIndex: ''
             });
             fetchQuestions();
         } catch (error) {
@@ -153,7 +149,7 @@ const ManageQuestions = () => {
                         <div className="lg:col-span-1 bg-yellow-50 rounded-2xl shadow-sm p-6 h-fit border border-yellow-200">
                             <h2 className="text-xl font-semibold mb-4 text-yellow-800 border-b border-yellow-200 pb-2">Questions Locked</h2>
                             <p className="text-yellow-700 text-sm leading-relaxed">
-                                You cannot add or delete questions because the exam start time has already passed, or students have already attended. The questions are now locked.
+                                You cannot add or delete questions because students have already attended this exam. The questions are now locked.
                             </p>
                         </div>
                     ) : (
@@ -183,31 +179,37 @@ const ManageQuestions = () => {
                                 </div>
 
                                 {newQuestion.questionType === 'MCQ' && (
-                                    <div className="space-y-3 pb-4">
-                                        <label className="block text-sm font-medium text-gray-700">Options * (Select the radio button for the correct answer)</label>
-                                        {newQuestion.options.map((opt, index) => (
-                                            <div key={index} className="flex items-center space-x-3">
-                                                <input
-                                                    type="radio"
-                                                    name="correctOption"
-                                                    required
-                                                    checked={newQuestion.correctAnswer === opt && opt !== ''}
-                                                    onChange={() => {
-                                                        if (opt) setNewQuestion({ ...newQuestion, correctAnswer: opt });
-                                                    }}
-                                                    className="h-5 w-5 text-green-600 focus:ring-green-500 cursor-pointer border-gray-300"
-                                                    title="Mark as correct answer"
-                                                />
-                                                <span className="font-bold text-gray-500 w-6 text-right">{String.fromCharCode(65 + index)}.</span>
-                                                <input
-                                                    type="text" required
-                                                    value={opt} onChange={e => handleOptionChange(index, e.target.value)}
-                                                    className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none transition-colors ${newQuestion.correctAnswer === opt && opt !== '' ? 'border-green-500 bg-green-50 focus:ring-green-400' : 'border-gray-300 focus:ring-indigo-400'}`}
-                                                    placeholder={`Option ${index + 1}`}
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <>
+                                        <div className="space-y-3 pb-4">
+                                            <label className="block text-sm font-medium text-gray-700">Options *</label>
+                                            {newQuestion.options.map((opt, index) => (
+                                                <div key={index} className="flex items-center space-x-3">
+                                                    <span className="font-bold text-gray-500 w-6 text-right">{String.fromCharCode(65 + index)}.</span>
+                                                    <input
+                                                        type="text" required
+                                                        value={opt} onChange={e => handleOptionChange(index, e.target.value)}
+                                                        className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none transition-colors ${newQuestion.correctAnswerIndex === String(index) ? 'border-green-500 bg-green-50 focus:ring-green-400' : 'border-gray-300 focus:ring-indigo-400'}`}
+                                                        placeholder={`Option ${index + 1}`}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="pb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Correct Answer *</label>
+                                            <select
+                                                required
+                                                value={newQuestion.correctAnswerIndex}
+                                                onChange={e => setNewQuestion({ ...newQuestion, correctAnswerIndex: e.target.value })}
+                                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                                            >
+                                                <option value="">-- Select Correct Answer --</option>
+                                                <option value="0">Option A</option>
+                                                <option value="1">Option B</option>
+                                                <option value="2">Option C</option>
+                                                <option value="3">Option D</option>
+                                            </select>
+                                        </div>
+                                    </>
                                 )}
 
                                 <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white py-3 rounded-lg font-medium transition-all shadow-md">
